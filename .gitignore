@@ -1,0 +1,10 @@
+
+data/
+test-models/
+tmp/
+
+\.idea/
+
+*.pyc
+
+cmake-build-debug/
