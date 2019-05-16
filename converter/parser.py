@@ -884,7 +884,7 @@ class Nnet3Parser(object):
         return comp_name, component
 
     def parse_sum_descp(self, input, sub_components):
-        items = input.split(",")
+        items = parenthesis_split(input, ",")
         kaldi_check(len(items) == 2, 'Sum descriptor should have 2 items.')
         sub_type = self.check_sub_inputs(items[0])
         if sub_type is not None:
