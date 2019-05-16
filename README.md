@@ -7,7 +7,8 @@
 **Kaldi-ONNX** is a tool for porting [Kaldi Speech Recognition Toolkit](https://github.com/kaldi-asr/kaldi) 
 neural network models to [ONNX](https://github.com/onnx/onnx) models for inference.
 With the converted ONNX model, you can use [MACE](https://github.com/XiaoMi/mace)
-to make predictions on mobile devices.
+to speedup the inference on Android, iOS, Linux or Windows devices with
+highly optimized NEON kernels (more heterogeneous devices will be supported in the future).
 
 This tool supports converting both Nnet2 and Nnet3 models. Almost all components
 in Nnet2 and Nnet3 models are supported, and the available components are listed

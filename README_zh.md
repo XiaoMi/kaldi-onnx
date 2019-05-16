@@ -6,7 +6,7 @@
 
 
 **Kaldi-ONNX** 是一个将[Kaldi](https://github.com/kaldi-asr/kaldi)的模型文件转换为[ONNX](https://github.com/onnx/onnx)模型的工具。
-转换得到的ONNX模型可以借助[MACE](https://github.com/XiaoMi/mace)框架部署到移动设备端进行推理运算。
+转换得到的ONNX模型可以借助[MACE](https://github.com/XiaoMi/mace)框架部署到Android, iOS, Linux或者Windows设备端进行推理运算。
 
 此工具支持Kaldi的Nnet2和Nnet3模型，大部分Nnet2和Nnet3组件都已支持，
 目前已支持的组件清单可以在文件converter/commmon.py中查看。
