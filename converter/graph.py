@@ -506,7 +506,6 @@ class Graph(object):
         return None
 
     def fuse_nodes(self):
-        print("Fuse Nodes: Check if any nodes could be fused.")
         fused_nodes = []
         for node in self._nodes:
             if node.type == KaldiOpType.StatisticsPooling.name and self._fuse_stats:
@@ -631,7 +630,6 @@ class Graph(object):
             input_indexes[node.name] = output_indexes
 
             if len(output_indexes) == 0 or output_indexes[0] > output_indexes[-1]:
-                print("Node: %s output indexes: %s" % (node.name, output_indexes))
                 return False
         return True
 

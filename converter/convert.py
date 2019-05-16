@@ -16,7 +16,9 @@
 converter.Convert - class to manage top level of converting progress
 python convert.py --input=path/to/kaldi_model.mdl \
                   --output=path/to/save/onnx_model.onnx \
-                  --chunk-size=cs --nnet-type=(2 or 3)
+                  --batch=b --chunk-size=cs --nnet-type=(2 or 3) \
+                  --fuse-lstm=(true or false, default is true) \
+                  --fuse-stats=(true or false, default is true)
 """
 
 from __future__ import print_function
@@ -164,7 +166,7 @@ def get_args():
     parser.add_argument('--fuse-lstm', type=str2bool,
                         dest='fuse_lstm', help='fuse lstm four parts to dynamic lstm or not, default is true',
                         default=True)
-    parser.add_argument('--fuse-statistics-extraction', type=str2bool,
+    parser.add_argument('--fuse-stats', type=str2bool,
                         dest='fuse_stats', help='fuse StatisticsExtraction and StatisticsPooling or not,'
                                                            ' default is true',
                         default=True)

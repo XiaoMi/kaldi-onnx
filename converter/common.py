@@ -114,7 +114,7 @@ KaldiOpRawType = {
     "FixedBiasComponent": 'Bias',
     "FixedLinearComponent": 'Linear',
     "FixedScaleComponent": 'Scales',
-    "GeneralDropoutComponent": 'DropOut',
+    "GeneralDropoutComponent": 'Dropout',
     "LinearComponent": 'Linear',
     "LogSoftmaxComponent": 'LogSoftmax',
     "LstmNonlinearityComponent": 'LstmNonlinear',

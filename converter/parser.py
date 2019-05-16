@@ -287,7 +287,7 @@ class Nnet3Parser(object):
             '<Dim>': (read_int, 'dim'),
             '<BlockDim>': (read_int, 'block_dim'),
             '<Epsilon>': (read_float, 'epsilon'),
-            '<TargetRms>': (read_int, 'target_rms'),
+            '<TargetRms>': (read_float, 'target_rms'),
             '<Count>': (read_float, 'count'),
             '<StatsMean>': (read_vector, 'stats_mean'),
             '<StatsVar>': (read_vector, 'stats_var'),
@@ -643,7 +643,7 @@ class Nnet3Parser(object):
         input_str = input_str.replace(' ', '')
         type = self.check_sub_inputs(input_str)
         if type is not None:
-            input_name, comp = self.parse_descriptor(type, input_str, sub_components)
+            input_name = self.parse_descriptor(type, input_str, sub_components)
             for item in sub_components:
                 self.add_component(item)
         else:
@@ -703,7 +703,8 @@ class Nnet3Parser(object):
         for item in items:
             type = self.check_sub_inputs(item)
             if type in NNet3Descriptors:
-                sub_comp_name, sub_comp = self.parse_descriptor(type, item, sub_components)
+                sub_comp_name = self.parse_descriptor(type, item, sub_components)
+                sub_comp = sub_components[-1]
                 append_inputs.append(sub_comp_name)
                 if type == NNet3Descriptor.Offset.name:
                     offset_components.append(sub_comp)
@@ -765,10 +766,10 @@ class Nnet3Parser(object):
                 'name': comp_name,
                 'input': append_inputs}
             sub_components.append(component)
-        return comp_name, component
+        return comp_name
 
     def parse_offset_descp(self, input, sub_components):
-        items = input.split(",")
+        items = parenthesis_split(input, ",")
         kaldi_check(len(items) == 2, 'Offset descriptor should have 2 items.')
         sub_type = self.check_sub_inputs(items[0])
         if sub_type is not None:
@@ -788,10 +789,10 @@ class Nnet3Parser(object):
             'offset': offset
         }
         sub_components.append(component)
-        return comp_name, component
+        return comp_name
 
     def parse_scale_descp(self, input, sub_components):
-        items = input.split(",")
+        items = parenthesis_split(input, ",")
         kaldi_check(len(items) == 2, 'Scale descriptor should have 2 items.')
         scale = float(items[0])
         sub_type = self.check_sub_inputs(items[1])
@@ -811,10 +812,10 @@ class Nnet3Parser(object):
             'scale': scale
         }
         sub_components.append(component)
-        return comp_name, component
+        return comp_name
 
     def parse_const_descp(self, input, sub_components):
-        items = input.split(",")
+        items = parenthesis_split(input, ",")
         kaldi_check(len(items) == 2, 'Const descriptor should have 2 items.')
         value = float(items[0])
         dimension = int(items[1])
@@ -829,17 +830,16 @@ class Nnet3Parser(object):
             'dim': dimension,
         }
         sub_components.append(component)
-        return comp_name, component
+        return comp_name
 
     def parse_round_descp(self, input, sub_components):
-        items = input.split(",")
+        items = parenthesis_split(input, ",")
         kaldi_check(len(items) == 2, 'Round descriptor should have 2 items.')
         sub_type = self.check_sub_inputs(items[0])
         if sub_type is not None:
-            sub_comp = self.parse_descriptor(sub_type,
+            input_name = self.parse_descriptor(sub_type,
                                              items[0],
                                              sub_components)
-            input_name = sub_comp['name']
         else:
             input_name = items[0]
         modulus = int(items[1])
@@ -853,16 +853,16 @@ class Nnet3Parser(object):
             'modulus': modulus
         }
         sub_components.append(component)
-        return comp_name, component
+        return comp_name
 
     def parse_switch_descp(self, input, sub_components):
-        items = input.split(",")
+        items = parenthesis_split(input, ",")
         kaldi_check(len(items) >= 2, 'Switch descriptor should have 2 items.')
         sub_type = self.check_sub_inputs(items[0])
         if sub_type is not None:
             input_name = self.parse_descriptor(sub_type,
-                                             items[0],
-                                             sub_components)
+                                               items[0],
+                                               sub_components)
         else:
             input_name = items[0]
         sub_type = self.check_sub_inputs(items[1])
@@ -900,6 +900,7 @@ class Nnet3Parser(object):
                                                sub_components)
         else:
             other_name = items[1]
+
         comp_name = input_name + '.Sum.' + other_name
         self._current_id += 1
         component = {
@@ -909,10 +910,10 @@ class Nnet3Parser(object):
             'input': [input_name, other_name],
         }
         sub_components.append(component)
-        return comp_name, component
+        return comp_name
 
     def parse_failover_descp(self, input, sub_components):
-        items = input.split(",")
+        items = parenthesis_split(input, ",")
         kaldi_check(len(items) == 2, 'Failover descriptor should have 2 items.')
         sub_type = self.check_sub_inputs(items[0])
         if sub_type is not None:
@@ -937,10 +938,10 @@ class Nnet3Parser(object):
             'input': [input_name, other_name],
         }
         sub_components.append(component)
-        return comp_name, component
+        return comp_name
 
     def parse_replace_index_descp(self, input, sub_components):
-        items = input.split(",")
+        items = parenthesis_split(input, ",")
         kaldi_check(len(items) == 3, 'ReplaceIndex descriptor should have 3 items.')
         sub_type = self.check_sub_inputs(items[0])
         if sub_type is not None:
@@ -962,7 +963,7 @@ class Nnet3Parser(object):
             'var_name': var_name,
             'modulus': value}
         sub_components.append(component)
-        return comp_name, component
+        return comp_name
 
     def parse_ifdefine_descp(self, input, sub_components):
         if input.startswith('Offset('):
@@ -972,8 +973,8 @@ class Nnet3Parser(object):
             sub_type = self.check_sub_inputs(items[0])
             if sub_type is not None:
                 input_name = self.parse_descriptor(sub_type,
-                                               items[0],
-                                               sub_components)
+                                                   items[0],
+                                                   sub_components)
             else:
                 if items[0] in self._component_names:
                     input_name = items[0]
@@ -994,7 +995,7 @@ class Nnet3Parser(object):
             'offset': offset,
         }
         sub_components.append(component)
-        return comp_name, component
+        return comp_name
 
     def parse_component_lines(self):
         """Parse all components lines before </Nnet3>"""

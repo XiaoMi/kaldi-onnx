@@ -71,7 +71,7 @@ def fetch_origin_input(input_str):
 def splice_continous_numbers(nums):
     kaldi_check(isinstance(nums, list),
                 "Only supports splice_continous_numbers in a list.")
-    kaldi_check(nums >= 2,
+    kaldi_check(len(nums) >= 2,
                 "input list should have at least two items.")
     new_nums = list()
     first = nums[0]
