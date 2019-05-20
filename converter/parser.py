@@ -718,10 +718,8 @@ class Nnet3Parser(object):
                 offset_indexes.append(items.index(item))
                 append_inputs.append(item)
 
-
         # check if fusing to splice needed
         pure_inputs = list(set(offset_inputs))
-        splice_indexes = splice_continous_numbers(offset_indexes)
 
         if num_inputs == len(offset_inputs) and len(pure_inputs) == 1:
             # print("Fuse Append to Splice 1.")
@@ -737,6 +735,7 @@ class Nnet3Parser(object):
                 sub_components.remove(item)
             sub_components.append(component)
         else:
+            splice_indexes = splice_continous_numbers(offset_indexes)
             if len(pure_inputs) == 1 and len(splice_indexes) == 1 and\
                     len(offset_inputs) > 1:
                 # print("Fuse Append to Splice 2.")
@@ -762,7 +761,7 @@ class Nnet3Parser(object):
             comp_name = 'append_' + str(self._current_id)
             component = {
                 'id': self._current_id,
-                'type': 'Append',
+                'type': 'Concat',
                 'name': comp_name,
                 'input': append_inputs}
             sub_components.append(component)

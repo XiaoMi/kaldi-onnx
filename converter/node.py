@@ -24,10 +24,10 @@ from utils import *
 
 
 def make_node(name, type, inputs, attrs=None, consts=None):
-    if type == KaldiOpType.Affine.name:
-        return AffineNode(name, type, inputs, attrs, consts)
-    elif type == KaldiOpType.Append.name:
-        return AppendNode(name, type, inputs, attrs, consts)
+    if type == KaldiOpType.Gemm.name:
+        return GemmNode(name, type, inputs, attrs, consts)
+    elif type == KaldiOpType.Concat.name:
+        return ConcatNode(name, type, inputs, attrs, consts)
     elif type == KaldiOpType.Bias.name:
         return BiasNode(name, type, inputs, attrs, consts)
     elif type == KaldiOpType.Constant.name:
@@ -104,6 +104,10 @@ class Node(object):
             self.consts = consts
 
     def update_attrs(self):
+        if self.type == KaldiOpType.Gemm.name:
+            self.attrs['transB'] = 1
+        elif self.type == KaldiOpType.Concat.name:
+            self.attrs['axis'] = -1
         for key, value in self.attrs.items():
             if key in ['input_dim',
                        'dim',
@@ -269,7 +273,7 @@ class Node(object):
         self.end_index = end
 
 
-class AffineNode(Node):
+class GemmNode(Node):
 
     def infer_shape(self, shapes):
         kaldi_check(self.inputs[0] in shapes,
@@ -292,7 +296,7 @@ class AffineNode(Node):
         self.output_shape = output_shape
 
 
-class AppendNode(Node):
+class ConcatNode(Node):
 
     def infer_index(self, indexes_by_name, save_index=False):
         start = -1000
@@ -325,7 +329,7 @@ class AppendNode(Node):
         output_shape = input_shape[0:-2]
         output_chunk = self.end_index - self.start_index + 1
         kaldi_check(output_chunk == input_shape[-2],
-                    "Append inputs' chunk size are not match.")
+                    "Concat inputs' chunk size are not match.")
         output_shape.append(output_chunk)
         output_shape.append(output_dim)
         self.output_shape = output_shape

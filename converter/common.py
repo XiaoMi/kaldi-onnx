@@ -31,8 +31,8 @@ IVECTOR_NAME = "ivector"
 
 KaldiOps = [
     'AdditiveNoise',
-    'Affine',
-    'Append',
+    'Gemm',
+    'Concat',
     'BatchNorm',
     'Bias',
     'ClipGradient',
@@ -93,13 +93,13 @@ KaldiOpType = Enum('KaldiOpType', [(op, op) for op in KaldiOps], type=str)
 
 KaldiOpRawType = {
     "AdditiveNoiseComponent": 'AdditiveNoise',
-    "AffineComponent": 'Affine',
-    "AffineComponentPreconditioned": 'Affine',
-    "AffineComponentPreconditionedOnline": 'Affine',
+    "AffineComponent": 'Gemm',
+    "AffineComponentPreconditioned": 'Gemm',
+    "AffineComponentPreconditionedOnline": 'Gemm',
     "BackpropTruncationComponent": 'Scale',
     "BatchNormComponent": 'BatchNorm',
-    "BlockAffineComponent": 'Affine',
-    "BlockAffineComponentPreconditioned": 'Affine',
+    "BlockAffineComponent": 'Gemm',
+    "BlockAffineComponentPreconditioned": 'Gemm',
     "ClipGradientComponent": 'ClipGradient',
     "ConstantComponent": 'Constant',
     'ConstantFunctionComponent': 'ConstantFunction',
@@ -110,7 +110,7 @@ KaldiOpRawType = {
     "DropoutComponent": 'Dropout',
     "DropoutMaskComponent": 'DropoutMask',
     "ElementwiseProductComponent": 'EltwiseProduct',
-    "FixedAffineComponent": 'Affine',
+    "FixedAffineComponent": 'Gemm',
     "FixedBiasComponent": 'Bias',
     "FixedLinearComponent": 'Linear',
     "FixedScaleComponent": 'Scales',
@@ -120,9 +120,9 @@ KaldiOpRawType = {
     "LstmNonlinearityComponent": 'LstmNonlinear',
     "MaxoutComponent": 'Maxout',
     "MaxpoolingComponent": 'Maxpooling',
-    "NaturalGradientAffineComponent": 'Affine',
+    "NaturalGradientAffineComponent": 'Gemm',
     "NaturalGradientPerElementScaleComponent": 'PerEltScale',
-    "NaturalGradientRepeatedAffineComponent": 'Affine',
+    "NaturalGradientRepeatedAffineComponent": 'Gemm',
     "NonlinearComponent": 'Nonlinear',
     "NoOpComponent": "NoOp",
     "NormalizeComponent": 'TargetRMSNorm',
@@ -133,7 +133,7 @@ KaldiOpRawType = {
     "PowerComponent": 'Power',
     "RandomComponent": "Random",
     "RectifiedLinearComponent": 'Relu',
-    "RepeatedAffineComponent": 'Affine',
+    "RepeatedAffineComponent": 'Gemm',
     "RestrictedAttentionComponent": 'RestrictedAttention',
     "ScaleComponent": 'Scale',
     "ScaleAndOffsetComponent": 'ScaleOffset',
@@ -258,7 +258,7 @@ NNet3Component = Enum('NNet3Component', [(op, op) for op in NNet3Components], ty
 
 ATTRIBUTE_NAMES = {
     KaldiOpType.AdditiveNoise.name: ['std_dev'],
-    KaldiOpType.Affine.name: ['num_repeats', 'num_blocks'],
+    KaldiOpType.Gemm.name: ['num_repeats', 'num_blocks'],
     KaldiOpType.BatchNorm.name: ['dim',
                                  'block_dim',
                                  'epsilon',
@@ -342,7 +342,7 @@ ATTRIBUTE_NAMES = {
 }
 
 CONSTS_NAMES = {
-    KaldiOpType.Affine.name: ['params', 'bias'],
+    KaldiOpType.Gemm.name: ['params', 'bias'],
     KaldiOpType.Bias.name: ['bias'],
     KaldiOpType.BatchNorm.name: ['stats_mean', 'stats_var'],
     KaldiOpType.Constant.name: ['constants'],
