@@ -12,7 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys, os, argparse
+import sys
+import os
+import argparse
 import numpy as np
 
 
@@ -21,9 +23,11 @@ def generate_features(batch, chunk, dim):
     print "genearted data shape:", data.shape
     return data
 
+
 def save_mace_input(data, file_path):
     # np.save(file_path, data)
     data.astype(np.float32).tofile(file_path)
+
 
 def save_kaldi_input(data, shape, out_path):
     with open(out_path, 'w') as f:
@@ -40,12 +44,14 @@ def save_kaldi_input(data, shape, out_path):
                 f.write(d_str)
             # f.write('\n')
 
+
 def get_args():
     """Parse commandline."""
     parser = argparse.ArgumentParser()
     parser.add_argument('--input_dim', type=int, help='input dim', default=40)
     parser.add_argument('--batch', type=int, help='batch size', default=1)
-    parser.add_argument('--chunk_size', type=int, help='chunk size', default=20)
+    parser.add_argument('--chunk_size', type=int,
+                        help='chunk size', default=20)
     parser.add_argument("--kaldi_input_file", required=True, type=str,
                         help="kaldi input data file path")
     parser.add_argument("--mace_input_file", required=True, type=str,
@@ -58,7 +64,9 @@ def main():
     args = get_args()
     data = generate_features(args.batch, args.chunk_size, args.input_dim)
     save_mace_input(data, args.mace_input_file)
-    save_kaldi_input(data, [args.batch, args.chunk_size, args.input_dim], args.kaldi_input_file)
+    save_kaldi_input(data, [args.batch, args.chunk_size,
+                            args.input_dim], args.kaldi_input_file)
+
 
 if __name__ == "__main__":
     main()

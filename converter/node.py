@@ -16,11 +16,13 @@
 converter.node - class to manage Node
 """
 
-from __future__ import print_function
 import six
+import logging
 
 from common import *
 from utils import *
+
+_LOG = logging.getLogger(__name__)
 
 
 def make_node(name, type, inputs, attrs=None, consts=None):
@@ -131,7 +133,8 @@ class Node(object):
                         'right_context' in self._attrs:
                     left_context = self.read_attribute('left_context')
                     right_context = self.read_attribute('right_context')
-                    context = [ t for t in range(-left_context, right_context + 1)]
+                    context = [
+                        t for t in range(-left_context, right_context + 1)]
                     self.attrs['context'] = context
 
     @property
@@ -218,18 +221,18 @@ class Node(object):
         return self.attrs[attr_name]
 
     def info(self):
-        print("name:%s type:%s"
-              " inputs:%s,"
-              " attrs: %s,"
-              " shape: %s,"
-              " time_index:[%s : %s]" %
-              (self.name,
-               self.type,
-               self.inputs,
-               self.attrs,
-               self.output_shape,
-               self.start_index,
-               self.end_index))
+        _LOG.info("name:%s type:%s"
+                  " inputs:%s,"
+                  " attrs: %s,"
+                  " shape: %s,"
+                  " time_index:[%s : %s]" %
+                  (self.name,
+                   self.type,
+                   self.inputs,
+                   self.attrs,
+                   self.output_shape,
+                   self.start_index,
+                   self.end_index))
 
     def infer_shape(self, shapes):
         # This is for the simple case, like NonLinear, Normalize etc.
@@ -246,7 +249,8 @@ class Node(object):
             output_dim = self.attrs['dim']
         else:
             kaldi_check(self.inputs[0] in shapes,
-                        "Node(%s)'s input(%s) has no shape." % (self.name, self.inputs[0]))
+                        "Node(%s)'s input(%s) has no shape." %
+                        (self.name, self.inputs[0]))
             input_shape = shapes[self.inputs[0]]
             output_dim = input_shape[-1]
         output_chunk = self.end_index - self.start_index + 1
@@ -264,7 +268,8 @@ class Node(object):
         if save_index:
             self.start_index = output_indexes[0]
             self.end_index = output_indexes[-1]
-            self.attrs['input_time_range'] = [output_indexes[0], output_indexes[-1]]
+            self.attrs['input_time_range'] = [
+                output_indexes[0], output_indexes[-1]]
         return output_indexes
 
     def map_to_input(self, start, end):
@@ -303,12 +308,15 @@ class ConcatNode(Node):
         end = 1000
         for input in self.inputs:
             if '.IfDefined' not in input:
-                kaldi_check(input in indexes_by_name,
-                            "node(%s)'s input(%s) should be computed before this."
-                            % (self.name, input))
+                kaldi_check(
+                    input in indexes_by_name,
+                    "node(%s)'s input(%s) should be computed before this." %
+                    (self.name, input))
                 input_indexes = indexes_by_name[input]
-                start = input_indexes[0] if input_indexes[0] >= start else start
-                end = input_indexes[-1] if input_indexes[-1] <= end else end
+                start = input_indexes[0]\
+                    if input_indexes[0] >= start else start
+                end = input_indexes[-1]\
+                    if input_indexes[-1] <= end else end
         if save_index:
             self.start_index = start
             self.end_index = end
@@ -318,7 +326,8 @@ class ConcatNode(Node):
 
     def infer_shape(self, shapes):
         kaldi_check(self.inputs[0] in shapes,
-                    "Node(%s)'s input(%s) has no shape." % (self.name, self.inputs[0]))
+                    "Node(%s)'s input(%s) has no shape." %
+                    (self.name, self.inputs[0]))
         input_shape = shapes[self.inputs[0]]
         output_dim = 0
         for input in self.inputs:
@@ -339,7 +348,8 @@ class BiasNode(Node):
 
     def infer_shape(self, shapes):
         kaldi_check(self.inputs[0] in shapes,
-                    "Node(%s)'s input(%s) has no shape." % (self.name, self.inputs[0]))
+                    "Node(%s)'s input(%s) has no shape." %
+                    (self.name, self.inputs[0]))
         input_shape = shapes[self.inputs[0]]
         weights_name = self.inputs[1]
         weights_shape = shapes[weights_name]
@@ -854,7 +864,7 @@ class SpliceNode(Node):
         context = self.read_attribute('context')
 
         output_dim = (input_dim - const_component_dim) * len(context)\
-                     + const_component_dim
+            + const_component_dim
         output_chunk = self.end_index - self.start_index + 1
         output_shape = input_shape[0:-2]
         output_shape.extend([output_chunk, output_dim])
@@ -867,6 +877,7 @@ class SpliceNode(Node):
         self.attrs['input_time_range'] = [start + left, end + right]
         self.start_index = start
         self.end_index = end
+
 
 class StatisticsExtractionNode(Node):
     def infer_index(self, indexes_by_name, save_index=False):
@@ -972,6 +983,7 @@ class SumGroupNode(Node):
         output_shape = input_shape[0:-2]
         output_shape.extend([output_chunk, output_dim])
         self.output_shape = output_shape
+
 
 class TargetRMSNormNode(Node):
     def infer_shape(self, shapes):

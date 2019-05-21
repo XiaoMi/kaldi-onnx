@@ -18,16 +18,19 @@ import numpy as np
 
 _LOG = logging.getLogger(__name__)
 
+
 def kaldi_check(condition, msg):
     if not condition:
         raise Exception(msg)
+
 
 def replace_item(a, old_item, new_item):
     kaldi_check(isinstance(a, list),
                 "Input should be a list.")
     if old_item not in a:
         return a
-    return [new_item if x==old_item else x for x in a]
+    return [new_item if x == old_item else x for x in a]
+
 
 def find(x, L):
     kaldi_check(isinstance(L, list),
@@ -38,10 +41,12 @@ def find(x, L):
     except ValueError:
         return None
 
+
 def merge_two_dicts(x, y):
     z = x.copy()
     z.update(y)
     return z
+
 
 def check_is_continous(nums, up=True):
     kaldi_check(isinstance(nums, list),
@@ -64,12 +69,14 @@ def check_is_continous(nums, up=True):
                 return False
     return True
 
+
 def fetch_origin_input(input_str):
     start_idx = input_str.find('(')
     end_idx = input_str.find(')')
     inner = input_str[start_idx + 1: end_idx]
     items = inner.split(',')
     return items[0]
+
 
 def splice_continous_numbers(nums):
     kaldi_check(isinstance(nums, list),
@@ -93,10 +100,12 @@ def splice_continous_numbers(nums):
             pre = nums[i]
     return new_nums
 
+
 def consume_token(token, line, pos):
     """Return line without token"""
     if token != line.split(None, 1)[0]:
-        _LOG.error("Unexpected token, expected '%s', got '%s'." % (token, line.split(None, 1)[0]))
+        _LOG.error("Unexpected token, expected '%s', got '%s'." %
+                   (token, line.split(None, 1)[0]))
 
     return line.partition(token)[2]
 
@@ -121,8 +130,9 @@ def read_float(line, pos, line_buffer):
     f = None
     try:
         f = float(tok)
-    except:
-        _LOG.error("{0}: at line position {1}, expected float but got {2}"
+    except Exception:
+        _LOG.error("{0}: at line position {1},"
+                   " expected float but got {2}"
                    .format(sys.argv[0], pos, tok))
     return f, pos
 
@@ -132,8 +142,9 @@ def read_int(line, pos, line_buffer):
     i = None
     try:
         i = int(tok)
-    except:
-        _LOG.error("at file position %s, expected int but got %s" % (pos, tok))
+    except Exception:
+        _LOG.error("at file position %s,"
+                   " expected int but got %s" % (pos, tok))
     return i, pos
 
 
@@ -145,7 +156,8 @@ def read_bool(line, pos, line_buffer):
     elif tok in['T', 'True', 'true']:
         b = True
     else:
-        _LOG.error("at file position %s, expected bool but got %s" % (pos, tok))
+        _LOG.error("at file position %s, expected bool but got %s" %
+                   (pos, tok))
     return b, pos
 
 
@@ -171,10 +183,10 @@ def read_vector(line, pos, line_buffer):
         try:
             f = float(tok)
             v.append(f)
-        except:
+        except Exception:
             _LOG.error("{0}: at line position {1}, reading vector,"
                        " expected vector but got {2}"
-                  .format(sys.argv[0], pos, tok), file=sys.stderr)
+                       .format(sys.argv[0], pos, tok), file=sys.stderr)
             return None, pos
     if tok is None:
         _LOG.error("encountered EOF while reading vector.")
@@ -187,7 +199,7 @@ def read_vector_int(line, pos, line_buffer):
     tok, pos = read_next_token(line, pos)
     if tok != '[':
         _LOG.error("{0}: at line position {1}, expected [ but got {2}"
-              .format(sys.argv[0], pos, tok), file=sys.stderr)
+                   .format(sys.argv[0], pos, tok), file=sys.stderr)
         return None, pos
     v = []
     while True:
@@ -205,10 +217,10 @@ def read_vector_int(line, pos, line_buffer):
         try:
             i = int(tok)
             v.append(i)
-        except:
+        except Exception:
             _LOG.error("{0}: at line position {1}, reading vector,"
-                  " expected float but got {2}"
-                  .format(sys.argv[0], pos, tok), file=sys.stderr)
+                       " expected float but got {2}"
+                       .format(sys.argv[0], pos, tok), file=sys.stderr)
             return None, pos
     if tok is None:
         _LOG.error("encountered EOF while reading vector.")
@@ -232,8 +244,8 @@ def read_matrix(line, pos, line_buffer):
     tok, pos = read_next_token(line, pos)
     if tok != '[':
         _LOG.error("{0}: at line position {1}, reading vector,"
-              " expected '[' but got {2}"
-              .format(sys.argv[0], pos, tok), file=sys.stderr)
+                   " expected '[' but got {2}"
+                   .format(sys.argv[0], pos, tok), file=sys.stderr)
         return None, pos
     # m will be an array of arrays (python arrays, not numpy arrays).
     m = []
@@ -251,10 +263,10 @@ def read_matrix(line, pos, line_buffer):
                 try:
                     f = float(tok)
                     v.append(f)
-                except:
+                except Exception:
                     _LOG.error("{0}: at line position {1}, reading vector,"
-                          "expected float but got {2}"
-                          .format(sys.argv[0], pos, tok), file=sys.stderr)
+                               "expected float but got {2}"
+                               .format(sys.argv[0], pos, tok), file=sys.stderr)
                     return None, pos
 
             saw_newline, pos = check_for_newline(line, pos)
@@ -268,8 +280,8 @@ def read_matrix(line, pos, line_buffer):
             line = next(line_buffer)
             if line is None:
                 _LOG.error("{0}: at line position {1}, reading vector,"
-                      " expected ']' but got end of lines"
-                      .format(sys.argv[0], pos), file=sys.stderr)
+                           " expected ']' but got end of lines"
+                           .format(sys.argv[0], pos), file=sys.stderr)
                 break
             else:
                 pos = 0
@@ -277,11 +289,11 @@ def read_matrix(line, pos, line_buffer):
     ans_mat = None
     try:
         ans_mat = np.array(m, dtype=np.float32)
-    except:
+    except Exception:
         if tok is None:
             _LOG.error("{0}: at line position {1}, reading vector,"
-                  " expected float but got {2}"
-                  .format(sys.argv[0], pos, tok), file=sys.stderr)
+                       " expected float but got {2}"
+                       .format(sys.argv[0], pos, tok), file=sys.stderr)
     return ans_mat, pos
 
 
@@ -294,8 +306,8 @@ def read_component_type(line, pos):
     component_type, pos = read_next_token(line, pos)
     if not is_component_type(component_type):
         _LOG.error("{0}: error reading Component: at position {1},"
-              " expected <xxxxComponent>,"
-              " got: {2}".format(sys.argv[0], pos, component_type))
+                   " expected <xxxxComponent>,"
+                   " got: {2}".format(sys.argv[0], pos, component_type))
         while True:
             tok, pos = read_next_token(line, pos)
 
@@ -305,57 +317,60 @@ def read_component_type(line, pos):
 
 
 def read_generic(line, pos, line_buffer, terminating_token, action_dict):
-        if isinstance(terminating_token, str):
-            terminating_tokens = set([terminating_token])
-        else:
-            terminating_tokens = terminating_token
-            assert isinstance(terminating_tokens, set)
-        assert isinstance(action_dict, dict)
+    if isinstance(terminating_token, str):
+        terminating_tokens = set([terminating_token])
+    else:
+        terminating_tokens = terminating_token
+        assert isinstance(terminating_tokens, set)
+    assert isinstance(action_dict, dict)
 
-        # d will contain the fields of the object.
-        d = dict()
-        orig_pos = pos
-        while True:
-            tok, pos = read_next_token(line, pos)
-            if tok in terminating_tokens:
+    # d will contain the fields of the object.
+    d = dict()
+    orig_pos = pos
+    while True:
+        tok, pos = read_next_token(line, pos)
+        if tok in terminating_tokens:
+            break
+        if tok is None:
+            line = next(line_buffer)
+            if line is None:
+                _LOG.error(
+                    "{0}: error reading object starting at position {1},"
+                    "got EOF while expecting one of: {2}".format(
+                        sys.argv[0], orig_pos, terminating_tokens))
                 break
-            if tok is None:
-                line = next(line_buffer)
-                if line is None:
-                    _LOG.error("{0}: error reading object starting at position {1},"
-                          "got EOF "
-                          "while expecting one of: {2}"
-                          .format(sys.argv[0], orig_pos, terminating_tokens))
-                    break
-                else:
-                    pos = 0
-                    continue
-            if tok in action_dict:
-                func, name = action_dict[tok]
-                obj, pos = func(line, pos, line_buffer)
-                d[name] = obj
-        return d, pos
+            else:
+                pos = 0
+                continue
+        if tok in action_dict:
+            func, name = action_dict[tok]
+            obj, pos = func(line, pos, line_buffer)
+            d[name] = obj
+    return d, pos
 
 
-def parenthesis_split(sentence, separator=" ", lparen="(", rparen=")"):
+def parenthesis_split(sentence,
+                      separator=" ",
+                      lparen="(",
+                      rparen=")"):
     nb_brackets = 0
     sentence = sentence.strip(separator)
 
-    l = [0]
+    ln = [0]
     for i, c in enumerate(sentence):
         if c == lparen:
             nb_brackets += 1
         elif c == rparen:
             nb_brackets -= 1
         elif c == separator and nb_brackets == 0:
-            l.append(i)
+            ln.append(i)
         # handle malformed string
         if nb_brackets < 0:
             raise Exception("Syntax error")
 
-    l.append(len(sentence))
+    ln.append(len(sentence))
     # handle missing closing parentheses
     if nb_brackets > 0:
         raise Exception("Syntax error")
 
-    return [sentence[i:j].strip(separator) for i, j in zip(l, l[1:])]
+    return [sentence[i:j].strip(separator) for i, j in zip(ln, ln[1:])]
