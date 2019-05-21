@@ -16,16 +16,13 @@
 python parser.py --input=path/to/kaldi_model.mdl --nnet-type=(2 or 3)
 """
 
-from __future__ import division
-from __future__ import unicode_literals
-
 import argparse
 import logging
+import re
+import sys
 
 from common import *
 from utils import *
-import re
-import sys
 
 _LOG = logging.getLogger(__name__)
 
@@ -125,36 +122,66 @@ class Nnet2Parser(object):
         }
 
         self._component_actions = {
-            NNet2Component.AdditiveNoiseComponent.name: self._additive_noise_actions,
-            NNet2Component.AffineComponent.name: self._affine_actions,
-            NNet2Component.AffineComponentPreconditioned.name: self._affine_actions,
-            NNet2Component.AffineComponentPreconditionedOnline.name: self._affine_actions,
-            NNet2Component.BlockAffineComponent.name: self._affine_actions,
-            NNet2Component.BlockAffineComponentPreconditioned.name: self._affine_actions,
-            NNet2Component.Convolutional1dComponent.name: self._convolutional1d_actions,
-            NNet2Component.DctComponent.name: self._dct_actions,
-            NNet2Component.DropoutComponent.name: self._dropout_actions,
-            NNet2Component.FixedAffineComponent.name: self._affine_actions,
-            NNet2Component.FixedBiasComponent.name: self._bias_actions,
-            NNet2Component.FixedLinearComponent.name: self._linear_actions,
-            NNet2Component.FixedScaleComponent.name: self._fixed_scale_actions,
-            NNet2Component.LogSoftmaxComponent.name: self._nonlinear_actions,
-            NNet2Component.MaxoutComponent.name: self._no_actions,
-            NNet2Component.MaxpoolingComponent.name: self._maxpooling_actions,
-            NNet2Component.NonlinearComponent.name: self._nonlinear_actions,
-            NNet2Component.NormalizeComponent.name: self._nonlinear_actions,
-            NNet2Component.PermuteComponent.name: self._permute_actions,
-            NNet2Component.PnormComponent.name: self._pnorm_actions,
-            NNet2Component.PowerComponent.name: self._power_actions,
-            NNet2Component.RectifiedLinearComponent.name: self._nonlinear_actions,
-            NNet2Component.ScaleComponent.name: self._scale_actions,
-            NNet2Component.SigmoidComponent.name: self._nonlinear_actions,
-            NNet2Component.SoftHingeComponent.name: self._nonlinear_actions,
-            NNet2Component.SoftmaxComponent.name: self._nonlinear_actions,
-            NNet2Component.SpliceComponent.name: self._splice_actions,
-            NNet2Component.SpliceMaxComponent.name: self._splice_actions,
-            NNet2Component.SumGroupComponent.name: self._sumgroup_actions,
-            NNet2Component.TanhComponent.name: self._nonlinear_actions,
+            NNet2Component.AdditiveNoiseComponent.name:
+                self._additive_noise_actions,
+            NNet2Component.AffineComponent.name:
+                self._affine_actions,
+            NNet2Component.AffineComponentPreconditioned.name:
+                self._affine_actions,
+            NNet2Component.AffineComponentPreconditionedOnline.name:
+                self._affine_actions,
+            NNet2Component.BlockAffineComponent.name:
+                self._affine_actions,
+            NNet2Component.BlockAffineComponentPreconditioned.name:
+                self._affine_actions,
+            NNet2Component.Convolutional1dComponent.name:
+                self._convolutional1d_actions,
+            NNet2Component.DctComponent.name:
+                self._dct_actions,
+            NNet2Component.DropoutComponent.name:
+                self._dropout_actions,
+            NNet2Component.FixedAffineComponent.name:
+                self._affine_actions,
+            NNet2Component.FixedBiasComponent.name:
+                self._bias_actions,
+            NNet2Component.FixedLinearComponent.name:
+                self._linear_actions,
+            NNet2Component.FixedScaleComponent.name:
+                self._fixed_scale_actions,
+            NNet2Component.LogSoftmaxComponent.name:
+                self._nonlinear_actions,
+            NNet2Component.MaxoutComponent.name:
+                self._no_actions,
+            NNet2Component.MaxpoolingComponent.name:
+                self._maxpooling_actions,
+            NNet2Component.NonlinearComponent.name:
+                self._nonlinear_actions,
+            NNet2Component.NormalizeComponent.name:
+                self._nonlinear_actions,
+            NNet2Component.PermuteComponent.name:
+                self._permute_actions,
+            NNet2Component.PnormComponent.name:
+                self._pnorm_actions,
+            NNet2Component.PowerComponent.name:
+                self._power_actions,
+            NNet2Component.RectifiedLinearComponent.name:
+                self._nonlinear_actions,
+            NNet2Component.ScaleComponent.name:
+                self._scale_actions,
+            NNet2Component.SigmoidComponent.name:
+                self._nonlinear_actions,
+            NNet2Component.SoftHingeComponent.name:
+                self._nonlinear_actions,
+            NNet2Component.SoftmaxComponent.name:
+                self._nonlinear_actions,
+            NNet2Component.SpliceComponent.name:
+                self._splice_actions,
+            NNet2Component.SpliceMaxComponent.name:
+                self._splice_actions,
+            NNet2Component.SumGroupComponent.name:
+                self._sumgroup_actions,
+            NNet2Component.TanhComponent.name:
+                self._nonlinear_actions,
         }
 
         self._current_component_id = 0
@@ -175,7 +202,7 @@ class Nnet2Parser(object):
         self.parse_component_lines(line, pos)
         self.add_input_node()
         _LOG.info("finished parse nnet2 (%s) components." %
-              len(self._components))
+                  len(self._components))
         return self._components
 
     def add_input_node(self):
@@ -457,16 +484,16 @@ class Nnet3Parser(object):
         }
 
         self._tdnn_actions = {
-			'<TimeOffsets>': (read_vector_int, 'time_offsets'),
-			'<LinearParams>': (read_matrix, 'params'),
-			'<BiasParams>': (read_vector, 'bias'),
-			'<OrthonormalConstraint>': (read_float, 'orthonormal_constraint'),
-			'<UseNaturalGradient>': (read_bool, 'use_natrual_gradient'),
-			'<RankInOut>': (read_int, 'rank_inout'),
+            '<TimeOffsets>': (read_vector_int, 'time_offsets'),
+            '<LinearParams>': (read_matrix, 'params'),
+            '<BiasParams>': (read_vector, 'bias'),
+            '<OrthonormalConstraint>': (read_float, 'orthonormal_constraint'),
+            '<UseNaturalGradient>': (read_bool, 'use_natrual_gradient'),
+            '<RankInOut>': (read_int, 'rank_inout'),
             '<NumSamplesHistory>': (read_float, 'num_samples_history'),
             '<Alpha>': (read_float, 'alpha'),
             '<AlphaInOut>': (read_float, 'alpha_inout'),
-		}
+        }
 
         self._sumblock_actions = {
             '<InputDim>': (read_int, 'input_dim'),
@@ -690,7 +717,7 @@ class Nnet3Parser(object):
         else:
             raise Exception(
                 'Does not support this descriptor type: {0} in input: {1}'
-                    .format(type, input_str))
+                .format(type, input_str))
 
     def parse_append_descp(self, input_str, sub_components):
         input_str = input_str.replace(" ", "")
@@ -706,7 +733,8 @@ class Nnet3Parser(object):
         for item in items:
             type = self.check_sub_inputs(item)
             if type in NNet3Descriptors:
-                sub_comp_name = self.parse_descriptor(type, item, sub_components)
+                sub_comp_name = self.parse_descriptor(
+                    type, item, sub_components)
                 sub_comp = sub_components[-1]
                 append_inputs.append(sub_comp_name)
                 if type == NNet3Descriptor.Offset.name:
@@ -754,7 +782,7 @@ class Nnet3Parser(object):
                 for i in range(num_inputs):
                     if i not in offset_indexes:
                         new_append_inputs.append(append_inputs[i])
-                    elif i == offset_indexes[0] :
+                    elif i == offset_indexes[0]:
                         new_append_inputs.append(splice_comp_name)
                 append_inputs = new_append_inputs
                 for item in offset_components:
@@ -840,8 +868,8 @@ class Nnet3Parser(object):
         sub_type = self.check_sub_inputs(items[0])
         if sub_type is not None:
             input_name = self.parse_descriptor(sub_type,
-                                             items[0],
-                                             sub_components)
+                                               items[0],
+                                               sub_components)
         else:
             input_name = items[0]
         modulus = int(items[1])
@@ -870,8 +898,8 @@ class Nnet3Parser(object):
         sub_type = self.check_sub_inputs(items[1])
         if sub_type is not None:
             other_name = self.parse_descriptor(sub_type,
-                                             items[1],
-                                             sub_components)
+                                               items[1],
+                                               sub_components)
         else:
             other_name = items[1]
         comp_name = input_name + '.Switch.' + other_name
@@ -916,7 +944,8 @@ class Nnet3Parser(object):
 
     def parse_failover_descp(self, input, sub_components):
         items = parenthesis_split(input, ",")
-        kaldi_check(len(items) == 2, 'Failover descriptor should have 2 items.')
+        kaldi_check(len(items) == 2,
+                    'Failover descriptor should have 2 items.')
         sub_type = self.check_sub_inputs(items[0])
         if sub_type is not None:
             input_name = self.parse_descriptor(sub_type,
@@ -944,7 +973,8 @@ class Nnet3Parser(object):
 
     def parse_replace_index_descp(self, input, sub_components):
         items = parenthesis_split(input, ",")
-        kaldi_check(len(items) == 3, 'ReplaceIndex descriptor should have 3 items.')
+        kaldi_check(len(items) == 3,
+                    'ReplaceIndex descriptor should have 3 items.')
         sub_type = self.check_sub_inputs(items[0])
         if sub_type is not None:
             input_name = self.parse_descriptor(sub_type,
@@ -971,7 +1001,8 @@ class Nnet3Parser(object):
         if input.startswith('Offset('):
             sub_input = input[7:-1]
             items = sub_input.split(",")
-            kaldi_check(len(items) == 2, 'IfDefined descriptor should have 2 items.')
+            kaldi_check(len(items) == 2,
+                        'IfDefined descriptor should have 2 items.')
             sub_type = self.check_sub_inputs(items[0])
             if sub_type is not None:
                 input_name = self.parse_descriptor(sub_type,
@@ -1031,19 +1062,19 @@ class Nnet3Parser(object):
                         num += 1
                 else:
                     _LOG.error("{0}: error reading component with name {1}"
-                          " at position {2}"
-                          .format(sys.argv[0],
-                                  component_name,
-                                  component_pos))
+                               " at position {2}"
+                               .format(sys.argv[0],
+                                       component_name,
+                                       component_pos))
             elif tok == NNet3End:
                 _LOG.info("finished parsing nnet3 (%s) components." % num)
                 assert num == self._num_components
                 break
             else:
                 _LOG.error("{0}: error reading Component:"
-                      " at position {1}, expected <ComponentName>,"
-                      " got: {2}"
-                      .format(sys.argv[0], pos, tok))
+                           " at position {1}, expected <ComponentName>,"
+                           " got: {2}"
+                           .format(sys.argv[0], pos, tok))
                 break
 
     def read_component(self, line, pos, component_type):
@@ -1085,10 +1116,10 @@ class Nnet3Parser(object):
             if tok is None:
                 line = next(line_buffer)
                 if line is None:
-                    _LOG.error("{0}: error reading object starting at position {1},"
-                          " got EOF "
-                          "while expecting one of: {2}"
-                          .format(sys.argv[0], orig_pos, terminating_tokens))
+                    _LOG.error(
+                        "{0}: error reading object starting at position {1},"
+                        " got EOF while expecting one of: {2}".format(
+                            sys.argv[0], orig_pos, terminating_tokens))
                     break
                 else:
                     pos = 0
@@ -1102,8 +1133,9 @@ class Nnet3Parser(object):
     @staticmethod
     def parse_nnet3_config(line):
         if re.search(
-            '^input-node|^component|^output-node|^component-node|^dim-range-node',
-            line.strip()) is None:
+            '^input-node|^component|^output-node|^component-node|'
+            '^dim-range-node',
+                line.strip()) is None:
             return [None, None]
         parts = line.split()
         config_type = parts[0]

@@ -16,14 +16,11 @@
 converter.graph - class to manage graph manipulation on top of ONNX
 """
 
-from __future__ import division
-from __future__ import unicode_literals
-
 import logging
-
-import numpy as np
-from onnx import defs, helper, checker, numpy_helper, optimizer, OperatorSetIdProto, onnx_pb
 import six
+import numpy as np
+
+from onnx import defs, helper, checker, numpy_helper, onnx_pb
 from node import *
 
 _LOG = logging.getLogger(__name__)
@@ -34,6 +31,7 @@ ONNX_UNKNOWN_DIMENSION = -1
 
 DOMAIN = "ai.kaldi2onnx"
 PRODUCER = "kaldi2onnx"
+
 
 class Graph(object):
 
@@ -153,7 +151,7 @@ class Graph(object):
                 self._shapes[const_name] = const.shape
 
     def update_input_outputs(self):
-        all_inputs  = []
+        all_inputs = []
         all_outputs = []
         for node in self._nodes:
             all_inputs.extend(node.inputs)
@@ -175,7 +173,8 @@ class Graph(object):
                     required_inputs = [input for input in node.inputs
                                        if input not in node.consts]
                     if set(required_inputs) <= set(checked_names) or \
-                            (node.type == KaldiOpType.IfDefined.name and ifdefine):
+                            (node.type == KaldiOpType.IfDefined.name and
+                             ifdefine):
                         updated_nodes.append(node)
                         checked_names.append(node.name)
         self._nodes = updated_nodes
@@ -189,7 +188,8 @@ class Graph(object):
         for name in self._inputs:
             chunk = 1 if name == IVECTOR_NAME else self._chunk_size
             if name in self._input_dims:
-                self._shapes[name] = [self._batch, chunk, self._input_dims[name]]
+                self._shapes[name] = [self._batch,
+                                      chunk, self._input_dims[name]]
 
     def init_inputs(self):
         for name in self._inputs:
@@ -212,7 +212,8 @@ class Graph(object):
                     origin_index = node.inputs[0].find('.IfDefined')
                     origin_input = node.inputs[0][0: origin_index]
                     if origin_input in self._shapes:
-                        self._shapes[node.inputs[0]] = self._shapes[origin_input]
+                        self._shapes[node.inputs[0]
+                                     ] = self._shapes[origin_input]
                 node.infer_shape(self._shapes)
                 if node.output_shape is not None:
                     self._shapes[node.name] = node.output_shape
@@ -334,13 +335,16 @@ class Graph(object):
         for node in self._nodes:
             for i in range(len(node.inputs)):
                 if node.inputs[i] in self._replace_input_tensors:
-                    node.inputs[i] = self._replace_input_tensors[node.inputs[i]]
+                    node.inputs[i] =\
+                        self._replace_input_tensors[node.inputs[i]]
             for i in range(len(node.nexts)):
                 if node.nexts[i] in self._replace_output_tensors:
-                    node.nexts[i] = self._replace_output_tensors[node.nexts[i]]
+                    node.nexts[i] =\
+                        self._replace_output_tensors[node.nexts[i]]
         for i in range(len(self._outputs)):
             if self._outputs[i] in self._replace_input_tensors:
-                self._outputs[i] = self._replace_input_tensors[self._outputs[i]]
+                self._outputs[i] =\
+                    self._replace_input_tensors[self._outputs[i]]
 
     def update_with_fused_nodes(self, fused_nodes):
         self.remove_nodes()
@@ -357,107 +361,134 @@ class Graph(object):
     def check_before_lstm(self, lstm_node):
         ifdef_inputs = []
         input = lstm_node.inputs[0]
-        if input in self._nodes_by_name:
-            append_a = self._nodes_by_name[input]
-            if append_a.type == KaldiOpType.Concat.name and \
-                    len(append_a.inputs) == 2:
-                sup_affine_name = append_a.inputs[0]
-                sup_ifdef_a_name = append_a.inputs[1]
-                if sup_affine_name in self._nodes_by_name and \
-                        sup_ifdef_a_name in self._nodes_by_name:
-                    affine = self._nodes_by_name[sup_affine_name]
-                    ifdef_a = self._nodes_by_name[sup_ifdef_a_name]
-                    if (affine.type == KaldiOpType.Gemm.name and
-                            ifdef_a.type == KaldiOpType.IfDefined.name):
-                        ifdef_inputs.append(ifdef_a.inputs[0])
-                        if affine.inputs[0] in self._nodes_by_name:
-                            append_b = self._nodes_by_name[affine.inputs[0]]
-                            if append_b.type == KaldiOpType.Concat.name and \
-                                    len(append_b.inputs) == 2:
-                                input_name = append_b.inputs[0]
-                                ifdef_b_name = append_b.inputs[1]
-                                if ifdef_b_name in self._nodes_by_name:
-                                    ifdef_b = self._nodes_by_name[ifdef_b_name]
-                                    if ifdef_b.type == KaldiOpType.IfDefined.name:
-                                        ifdef_inputs.append(ifdef_b.inputs[0])
-                                        nodes_before_lstm = [ifdef_b,
-                                                             append_b,
-                                                             affine,
-                                                             ifdef_a,
-                                                             append_a]
-                                        return True, input_name, ifdef_inputs,  nodes_before_lstm
+        if input not in self._nodes_by_name:
+            return False, None, None, None
+        append_a = self._nodes_by_name[input]
+        if append_a.type != KaldiOpType.Concat.name or\
+                len(append_a.inputs) != 2:
+            return False, None, None, None
+        sup_affine_name = append_a.inputs[0]
+        sup_ifdef_a_name = append_a.inputs[1]
+        if sup_affine_name not in self._nodes_by_name or \
+                sup_ifdef_a_name not in self._nodes_by_name:
+            return False, None, None, None
+        affine = self._nodes_by_name[sup_affine_name]
+        ifdef_a = self._nodes_by_name[sup_ifdef_a_name]
+        if affine.type != KaldiOpType.Gemm.name or\
+                ifdef_a.type != KaldiOpType.IfDefined.name:
+            return False, None, None, None
+        ifdef_inputs.append(ifdef_a.inputs[0])
+        if affine.inputs[0] not in self._nodes_by_name:
+            return False, None, None, None
+        append_b = self._nodes_by_name[affine.inputs[0]]
+        if append_b.type != KaldiOpType.Concat.name or \
+                len(append_b.inputs) != 2:
+            return False, None, None, None
+        input_name = append_b.inputs[0]
+        ifdef_b_name = append_b.inputs[1]
+        if ifdef_b_name in self._nodes_by_name:
+            ifdef_b = self._nodes_by_name[ifdef_b_name]
+            if ifdef_b.type == KaldiOpType.IfDefined.name:
+                ifdef_inputs.append(ifdef_b.inputs[0])
+                nodes_before = [ifdef_b,
+                                append_b,
+                                affine,
+                                ifdef_a,
+                                append_a]
+                return (True,
+                        input_name,
+                        ifdef_inputs,
+                        nodes_before)
         return False, None, None, None
 
     def check_after_lstm(self, lstm_node, if_def_inputs):
-        nodes_after_lstm = []
-        if len(lstm_node.nexts) == 2:
-            slice_a_name = lstm_node.nexts[0]
-            slice_b_name = lstm_node.nexts[1]
-            if slice_a_name in self._nodes_by_name and slice_b_name in self._nodes_by_name:
-                slice_a = self._nodes_by_name[slice_a_name]
-                slice_b = self._nodes_by_name[slice_b_name]
-                if slice_a.type == KaldiOpType.DimRange.name and \
-                        slice_b.type == KaldiOpType.DimRange.name:
-                    if slice_a.nexts[0] in self._nodes_by_name and \
-                            slice_b.nexts[0] in self._nodes_by_name:
-                        left_node = self._nodes_by_name[slice_a.nexts[0]]
-                        right_node = self._nodes_by_name[slice_b.nexts[0]]
-                        if (left_node.type == KaldiOpType.Gemm.name and
-                            right_node.type == KaldiOpType.Concat.name) or \
-                                (left_node.type == KaldiOpType.Concat.name and
-                                 right_node.type == KaldiOpType.Gemm.name):
-                            if left_node.type == KaldiOpType.Gemm.name and \
-                                    right_node.type == KaldiOpType.Concat.name:
-                                append_node = right_node
-                                affine_node = left_node
-                                nodes_after_lstm.append(slice_a)
-                                nodes_after_lstm.append(slice_b)
-                            else:
-                                append_node = left_node
-                                affine_node = right_node
-                                nodes_after_lstm.append(slice_b)
-                                nodes_after_lstm.append(slice_a)
-                            nodes_after_lstm.append(affine_node)
-                            if len(append_node.inputs) == 2:
-                                if slice_b_name == append_node.inputs[1]:
-                                    dim_range_b_name = append_node.inputs[0]
-                                else:
-                                    dim_range_b_name = append_node.inputs[1]
-                                if dim_range_b_name in affine_node.nexts:
-                                    nodes_after_lstm.append(self._nodes_by_name[dim_range_b_name])
-                                    nodes_after_lstm.append(append_node)
-                                    if append_node.nexts[0] in self._nodes_by_name:
-                                        scale_node = self._nodes_by_name[append_node.nexts[0]]
-                                        if scale_node.type == KaldiOpType.Scale.name:
-                                            if len(scale_node.nexts) == 2:
-                                                nodes_after_lstm.append(scale_node)
-                                                if scale_node.nexts[0] in self._nodes_by_name and \
-                                                        scale_node.nexts[1] in self._nodes_by_name:
-                                                    last_dim_range_0 = self._nodes_by_name[scale_node.nexts[0]]
-                                                    last_dim_range_1 = self._nodes_by_name[scale_node.nexts[1]]
-                                                    if last_dim_range_0.type == KaldiOpType.DimRange.name and \
-                                                            last_dim_range_1.type == KaldiOpType.DimRange.name:
-                                                        nodes_after_lstm.append(last_dim_range_0)
-                                                        nodes_after_lstm.append(last_dim_range_1)
-                                                        if (last_dim_range_0.name in if_def_inputs or
-                                                            last_dim_range_0.name + '.IfDefined' in if_def_inputs) and \
-                                                                (last_dim_range_1.name in if_def_inputs or
-                                                                 last_dim_range_1.name + '.IfDefined' in if_def_inputs):
-                                                            return True, affine_node.name, nodes_after_lstm
+        nodes_after = []
+        if len(lstm_node.nexts) != 2:
+            return False, None, None
+        slice_a_name = lstm_node.nexts[0]
+        slice_b_name = lstm_node.nexts[1]
+        if slice_a_name not in self._nodes_by_name or\
+                slice_b_name not in self._nodes_by_name:
+            return False, None, None
+        slice_a = self._nodes_by_name[slice_a_name]
+        slice_b = self._nodes_by_name[slice_b_name]
+        if slice_a.type != KaldiOpType.DimRange.name or\
+                slice_b.type != KaldiOpType.DimRange.name:
+            return False, None, None
+        if slice_a.nexts[0] not in self._nodes_by_name or\
+                slice_b.nexts[0] not in self._nodes_by_name:
+            return False, None, None
+        left_node = self._nodes_by_name[slice_a.nexts[0]]
+        right_node = self._nodes_by_name[slice_b.nexts[0]]
+        check_left_right = (left_node.type == KaldiOpType.Gemm.name and
+                            right_node.type == KaldiOpType.Concat.name) or\
+                           (left_node.type == KaldiOpType.Concat.name and
+                            right_node.type == KaldiOpType.Gemm.name)
+        if check_left_right is False:
+            return False, None, None
+        if left_node.type == KaldiOpType.Gemm.name and\
+                right_node.type == KaldiOpType.Concat.name:
+            append_node = right_node
+            affine_node = left_node
+            nodes_after.append(slice_a)
+            nodes_after.append(slice_b)
+        else:
+            append_node = left_node
+            affine_node = right_node
+            nodes_after.append(slice_b)
+            nodes_after.append(slice_a)
+        nodes_after.append(affine_node)
+        if len(append_node.inputs) != 2:
+            return False, None, None
+        if slice_b_name == append_node.inputs[1]:
+            dim_range_b_name = append_node.inputs[0]
+        else:
+            dim_range_b_name = append_node.inputs[1]
+        if dim_range_b_name not in affine_node.nexts or\
+                append_node.nexts[0] not in self._nodes_by_name:
+            return False, None, None
+        nodes_after.append(self._nodes_by_name[dim_range_b_name])
+        nodes_after.append(append_node)
+        scale_node = self._nodes_by_name[append_node.nexts[0]]
+        if scale_node.type != KaldiOpType.Scale.name or\
+                len(scale_node.nexts) != 2:
+            return False, None, None
+        nodes_after.append(scale_node)
+        if scale_node.nexts[0] not in self._nodes_by_name or\
+                scale_node.nexts[1] not in self._nodes_by_name:
+            return False, None, None
+        last_dim_range_0 = self._nodes_by_name[scale_node.nexts[0]]
+        last_dim_range_1 = self._nodes_by_name[scale_node.nexts[1]]
+        if last_dim_range_0.type != KaldiOpType.DimRange.name or\
+                last_dim_range_1.type != KaldiOpType.DimRange.name:
+            return False, None, None
+        nodes_after.append(last_dim_range_0)
+        nodes_after.append(last_dim_range_1)
+        if (last_dim_range_0.name in if_def_inputs or
+            last_dim_range_0.name + '.IfDefined' in if_def_inputs) and\
+                (last_dim_range_1.name in if_def_inputs or
+                 last_dim_range_1.name + '.IfDefined' in if_def_inputs):
+            return True, affine_node.name, nodes_after
         return False, None, None
 
     def check_extraction_pooling_round(self, node):
-        if len(node.inputs) == 1:
-            input_name = node.inputs[0]
-            if input_name in self._nodes_by_name:
-                extraction_node = self._nodes_by_name[input_name]
-                if extraction_node.type == KaldiOpType.StatisticsExtraction.name:
-                    if len(node.nexts) == 1:
-                        next_name = node.nexts[0]
-                        if next_name in self._nodes_by_name:
-                            round_node = self._nodes_by_name[next_name]
-                            if round_node.type == KaldiOpType.Round.name:
-                                return [extraction_node, node, round_node]
+        if len(node.inputs) != 1:
+            return None
+        input_name = node.inputs[0]
+        if input_name not in self._nodes_by_name:
+            return None
+        extraction_node = self._nodes_by_name[input_name]
+        if extraction_node.type !=\
+                KaldiOpType.StatisticsExtraction.name:
+            return None
+        if len(node.nexts) != 1:
+            return None
+        next_name = node.nexts[0]
+        if next_name not in self._nodes_by_name:
+            return None
+        round_node = self._nodes_by_name[next_name]
+        if round_node.type == KaldiOpType.Round.name:
+            return [extraction_node, node, round_node]
         return None
 
     def check_fuse_extraction_pooling_round(self, node):
@@ -469,11 +500,15 @@ class Graph(object):
             round_node = extract_pooling_pack[2]
 
             extract_input_dim = extraction_node.read_attribute('input_dim')
-            extract_input_period = extraction_node.read_attribute('input_period')
-            extract_output_period = extraction_node.read_attribute('output_period')
-            include_variance = extraction_node.read_attribute('include_variance')
+            extract_input_period = extraction_node.read_attribute(
+                'input_period')
+            extract_output_period = extraction_node.read_attribute(
+                'output_period')
+            include_variance = extraction_node.read_attribute(
+                'include_variance')
 
-            num_log_count = pooling_node.read_attribute('num_log_count_features')
+            num_log_count = pooling_node.read_attribute(
+                'num_log_count_features')
             left_context = pooling_node.read_attribute('left_context')
             right_context = pooling_node.read_attribute('right_context')
             variance_floor = pooling_node.read_attribute('variance_floor')
@@ -514,22 +549,30 @@ class Graph(object):
     def fuse_nodes(self):
         fused_nodes = []
         for node in self._nodes:
-            if node.type == KaldiOpType.StatisticsPooling.name and self._fuse_stats:
-                extract_pooling_node = self.check_fuse_extraction_pooling_round(node)
+            if node.type == KaldiOpType.StatisticsPooling.name and\
+                    self._fuse_stats:
+                extract_pooling_node =\
+                    self.check_fuse_extraction_pooling_round(node)
                 if extract_pooling_node is not None:
                     self._need_check_output_indexes = True
                     fused_nodes.append(extract_pooling_node)
-            elif node.type == KaldiOpType.LstmNonlinear.name and self._fuse_lstm:
-                check_before, lstm_input, ifdef_inputs, nodes_before = self.check_before_lstm(node)
+            elif node.type == KaldiOpType.LstmNonlinear.name and\
+                    self._fuse_lstm:
+                check_before, lstm_input, ifdef_inputs, nodes_before =\
+                    self.check_before_lstm(node)
                 if check_before:
-                    check_after, lstm_output, nodes_after = self.check_after_lstm(node, ifdef_inputs)
+                    check_after, lstm_output, nodes_after =\
+                        self.check_after_lstm(node, ifdef_inputs)
                     if check_after:
-                        dynamic_lstm_node = self.fuse_dynamic_lstm(node,
-                                                                   lstm_input,
-                                                                   nodes_before,
-                                                                   nodes_after)
-                        self._replace_output_tensors[lstm_input] = dynamic_lstm_node.name
-                        self._replace_input_tensors[lstm_output] = dynamic_lstm_node.name
+                        dynamic_lstm_node =\
+                            self.fuse_dynamic_lstm(node,
+                                                   lstm_input,
+                                                   nodes_before,
+                                                   nodes_after)
+                        self._replace_output_tensors[lstm_input] =\
+                            dynamic_lstm_node.name
+                        self._replace_input_tensors[lstm_output] =\
+                            dynamic_lstm_node.name
                         self._remove_nodes.extend(nodes_before)
                         self._remove_nodes.append(node)
                         self._remove_nodes.extend(nodes_after)
@@ -542,7 +585,9 @@ class Graph(object):
         replace_node_name = node.inputs[0]
         for nd in self._nodes:
             inputs = nd.inputs
-            inputs[:] = [x if x != remove_node_name else replace_node_name
+            inputs[:] = [x
+                         if x != remove_node_name
+                         else replace_node_name
                          for x in inputs]
             nd.inputs = inputs
 
@@ -550,7 +595,8 @@ class Graph(object):
         input_nodes = []
         for input in node.inputs:
             if input in self._nodes_by_name:
-                input_nodes.append(self._nodes_by_name[input])
+                input_nodes.append(
+                    self._nodes_by_name[input])
         return input_nodes
 
     @staticmethod
@@ -606,7 +652,7 @@ class Graph(object):
         self._left_context = left_context
         self._right_context = right_context
         _LOG.info("left_context: %s, right context: %s"
-              % (left_context, right_context))
+                  % (left_context, right_context))
 
     def reset_append_input_index(self):
         for node in self._nodes:
@@ -635,11 +681,15 @@ class Graph(object):
             output_indexes = node.infer_index(input_indexes, save_index)
             input_indexes[node.name] = output_indexes
 
-            if len(output_indexes) == 0 or output_indexes[0] > output_indexes[-1]:
+            if len(output_indexes) == 0 or\
+                    output_indexes[0] > output_indexes[-1]:
                 return False
         return True
 
-    def evaluate_time_index(self, left_context, right_context, window_size=100):
+    def evaluate_time_index(self,
+                            left_context,
+                            right_context,
+                            window_size=100):
         indexes_by_name = self.get_input_indexes(-left_context,
                                                  window_size + right_context)
         if self.infer_time_index(indexes_by_name) is False:

@@ -29,7 +29,7 @@ pip install -r requirements.txt
 ### 2. Prepare models
 This tool only supports Kaldi's text model as an input.
 
-If you have a binary model, Kaldi's `nnet-am-copy` or `nnet3-copy` tool can help you get a text one:
+If you have a binary model, Kaldi's `nnet-am-copy` or `nnet3-am-copy` tool can help you get a text one:
 
 Nnet2 Model
 
@@ -41,12 +41,13 @@ path/to/kaldi/src/nnet2bin/nnet-am-copy --binary=false          \
 Nnet3 Model
 
 ```sh
-path/to/kaldi/src/nnet3bin/nnet3-copy --binary=false          \
-                                      --prepare-for-test=true \
-                                      final.raw text.mdl
+path/to/kaldi/src/nnet3bin/nnet3-am-copy --binary=false          \
+                                         --raw=true              \
+                                         --prepare-for-test=true \
+                                         final.raw text.mdl
 ```
 
-Don't forget to use the `--prepare-for-test=true` option to optimize the model.
+Don't forget to use the `--prepare-for-test=true` and `--raw=true`option to optimize the model.
 
 More details about kaldi's tools  are in [Kaldi's Documentation](http://kaldi-asr.org/doc/).
 

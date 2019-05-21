@@ -12,51 +12,56 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import numpy as np, os, sys, argparse
+import numpy as np
+import os
+import sys
+import argparse
 
 
 def save_to_txt(data, shape, out_path):
-	header = 'utterance-id1  [\n'
-	with open(out_path, 'w') as f:
-		f.write(header)
-		for n in xrange(shape[0]):
-			d = data[n, :]
-			d_str = " ".join(str(x) for x in d)
-			if n < shape[0] - 1:
-				d_str = d_str + '\n'
-			else:
-				d_str = d_str + ' ]\n'
-			f.write(d_str)
+    header = 'utterance-id1  [\n'
+    with open(out_path, 'w') as f:
+        f.write(header)
+        for n in xrange(shape[0]):
+            d = data[n, :]
+            d_str = " ".join(str(x) for x in d)
+            if n < shape[0] - 1:
+                d_str = d_str + '\n'
+            else:
+                d_str = d_str + ' ]\n'
+            f.write(d_str)
 
 
 def get_args():
-	"""Parse commandline."""
-	parser = argparse.ArgumentParser()
-	parser.add_argument("--input", required=True, type=str,
-						help="kaldi data file path")
-	parser.add_argument("--output", required=True, type=str,
-						help="mace data file path")
-	args = parser.parse_args()
-	return args
+    """Parse commandline."""
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--input", required=True, type=str,
+                        help="kaldi data file path")
+    parser.add_argument("--output", required=True, type=str,
+                        help="mace data file path")
+    args = parser.parse_args()
+    return args
 
 
 def read_kaldi_output(file_path):
-	data_lines = []
-	with open(file_path, 'r') as f:
-		lines = f.readlines()
-		for l in lines:
-			if '[' not in l:
-				tmp = l.split()
-				if ']' in l:
-					del tmp[-1]
-				data_line = [float(x) for x in tmp]
-				data_lines.append(data_line)
-	return np.array(data_lines)
+    data_lines = []
+    with open(file_path, 'r') as f:
+        lines = f.readlines()
+        for l in lines:
+            if '[' not in l:
+                tmp = l.split()
+                if ']' in l:
+                    del tmp[-1]
+                data_line = [float(x) for x in tmp]
+                data_lines.append(data_line)
+    return np.array(data_lines)
+
 
 def main():
-	args = get_args()
-	kaldi_data = read_kaldi_output(args.input)
-	kaldi_data.astype(np.float32).tofile(args.output)
+    args = get_args()
+    kaldi_data = read_kaldi_output(args.input)
+    kaldi_data.astype(np.float32).tofile(args.output)
+
 
 if __name__ == "__main__":
-	main()
+    main()

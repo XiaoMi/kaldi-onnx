@@ -20,13 +20,17 @@ python convert.py --input=path/to/kaldi_model.mdl \
                   --fuse-lstm=(true or false, default is true) \
                   --fuse-stats=(true or false, default is true)
 """
+
+import argparse
 import logging
-import argparse, os, six
-from graph import Graph
-from parser import Nnet2Parser, Nnet3Parser
-from node import make_node
-from utils import kaldi_check
+import os
+import six
+
 from common import *
+from graph import Graph
+from node import make_node
+from parser import Nnet2Parser, Nnet3Parser
+from utils import kaldi_check
 
 
 class Converter(object):
@@ -101,13 +105,15 @@ class Converter(object):
         kaldi_check('name' in component
                     and 'input' in component
                     and 'type' in component,
-                    "'name', 'type' and 'input' are required in component: %s" % component)
+                    "'name', 'type' and 'input'"
+                    " are required in component: %s" % component)
         type = component['type']
         name = component['name']
         inputs = component['input']
         if not isinstance(inputs, list):
             inputs = [inputs]
-        inputs = [input if isinstance(input, six.string_types) else str(input)
+        inputs = [input if isinstance(input, six.string_types)
+                  else str(input)
                   for input in inputs]
 
         attrs = {}
@@ -142,6 +148,7 @@ class Converter(object):
         outputs = component['input']
         self._outputs.extend(outputs)
 
+
 def str2bool(v):
     if v.lower() in ('yes', 'true', 'True', 't', 'y', '1'):
         return True
@@ -150,23 +157,29 @@ def str2bool(v):
     else:
         raise argparse.ArgumentTypeError('Unsupported value encountered.')
 
+
 def get_args():
     """Parse commandline."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", required=True, help="input model file")
     parser.add_argument("--output", help="path to save output onnx model file")
     parser.add_argument('--chunk-size', type=int, dest='chunk_size',
-                        help='chunk size, default is 20', default=DefaultChunkSize)
+                        help='chunk size, default is 20',
+                        default=DefaultChunkSize)
     parser.add_argument('--batch', type=int, dest='batch',
                         help='batch size, default is 1', default=DefaultBatch)
     parser.add_argument('--nnet-type', type=int,
-                        dest='nnet_type', help='nnet type: 2 or 3', default=NNet3)
+                        dest='nnet_type', help='nnet type: 2 or 3',
+                        default=NNet3)
     parser.add_argument('--fuse-lstm', type=str2bool,
-                        dest='fuse_lstm', help='fuse lstm four parts to dynamic lstm or not, default is true',
+                        dest='fuse_lstm',
+                        help='fuse lstm four parts to dynamic lstm or not,'
+                             ' default is true',
                         default=True)
     parser.add_argument('--fuse-stats', type=str2bool,
-                        dest='fuse_stats', help='fuse StatisticsExtraction and StatisticsPooling or not,'
-                                                           ' default is true',
+                        dest='fuse_stats',
+                        help='fuse StatisticsExtraction/StatisticsPooling'
+                             ' or not, default is true',
                         default=True)
 
     args = parser.parse_args()
@@ -192,13 +205,14 @@ def main():
             with open(output_path, "wb") as of:
                 of.write(onnx_model.SerializeToString())
                 logging.info("Kaldi to ONNX converting finished!")
-                logging.info("The new onnx model file is:", output_path)
+                logging.info("The new onnx model file is: %s" % output_path)
     else:
         raise Exception("invalid input file path: {0}.".format(args.input))
 
 
 if __name__ == "__main__":
-    logging.basicConfig(format="%(asctime)s %(name)s %(levelname)s %(message)s",
-                        level=logging.INFO)
+    logging.basicConfig(
+        format="%(asctime)s %(name)s %(levelname)s %(message)s",
+        level=logging.INFO)
 
     main()

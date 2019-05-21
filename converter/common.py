@@ -89,7 +89,9 @@ KaldiOps = [
     # 'Output',
     'DimRange',
 ]
-KaldiOpType = Enum('KaldiOpType', [(op, op) for op in KaldiOps], type=str)
+KaldiOpType = Enum('KaldiOpType',
+                   [(op, op) for op in KaldiOps],
+                   type=str)
 
 KaldiOpRawType = {
     "AdditiveNoiseComponent": 'AdditiveNoise',
@@ -188,7 +190,9 @@ NNet2Components = [
     'SumGroupComponent',
     'TanhComponent',
 ]
-NNet2Component = Enum('NNet2Component', [(op, op) for op in NNet2Components], type=str)
+NNet2Component = Enum('NNet2Component',
+                      [(op, op) for op in NNet2Components],
+                      type=str)
 
 
 NNet3Descriptors = [
@@ -203,7 +207,9 @@ NNet3Descriptors = [
     'Switch',
     'Failover',
 ]
-NNet3Descriptor = Enum('NNet3Descriptors', [(op, op) for op in NNet3Descriptors], type=str)
+NNet3Descriptor = Enum('NNet3Descriptors',
+                       [(op, op) for op in NNet3Descriptors],
+                       type=str)
 
 
 NNet3Components = [
@@ -253,7 +259,9 @@ NNet3Components = [
     'TdnnComponent',
     'TimeHeightConvolutionComponent',
 ]
-NNet3Component = Enum('NNet3Component', [(op, op) for op in NNet3Components], type=str)
+NNet3Component = Enum('NNet3Component',
+                      [(op, op) for op in NNet3Components],
+                      type=str)
 
 
 ATTRIBUTE_NAMES = {
@@ -336,7 +344,7 @@ ATTRIBUTE_NAMES = {
                                          'right_context',
                                          'num_log_count_features',
                                          'output_stddevs',
-                                         'variance_floor',],
+                                         'variance_floor', ],
     KaldiOpType.SumGroup.name: ['output_dim'],
 
 }
@@ -350,12 +358,18 @@ CONSTS_NAMES = {
     KaldiOpType.Conv1d.name: ['params', 'bias'],
     KaldiOpType.Convolution.name: ['params', 'bias'],
     KaldiOpType.Linear.name: ['params'],
-    KaldiOpType.LstmNonlinear.name: ['params', 'value_avg', 'deriv_avg'],
-    KaldiOpType.Nonlinear.name: ['value_avg', 'deriv_avg', 'value_sum', 'deriv_sum'],
+    KaldiOpType.LstmNonlinear.name: ['params',
+                                     'value_avg',
+                                     'deriv_avg'],
+    KaldiOpType.Nonlinear.name: ['value_avg',
+                                 'deriv_avg',
+                                 'value_sum',
+                                 'deriv_sum'],
     KaldiOpType.PerEltOffset.name: ['offsets'],
     KaldiOpType.PerEltScale.name: ['params'],
     KaldiOpType.Permute.name: ['column_map', 'reorder'],
-    KaldiOpType.RestrictedAttention.name: ['entropy_stats', 'posterior_stats'],
+    KaldiOpType.RestrictedAttention.name: ['entropy_stats',
+                                           'posterior_stats'],
     KaldiOpType.FixedScale.name: ['scales'],
     KaldiOpType.ScaleOffset.name: ['scales', 'offsets'],
     KaldiOpType.SumGroup.name: ['sizes'],
