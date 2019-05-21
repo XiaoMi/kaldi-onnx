@@ -21,7 +21,7 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 import numpy as np
-from onnx import defs, helper, numpy_helper, optimizer, OperatorSetIdProto, onnx_pb
+from onnx import defs, helper, checker, numpy_helper, optimizer, OperatorSetIdProto, onnx_pb
 import six
 from node import *
 
@@ -29,6 +29,8 @@ INTERNAL_NAME = 1
 PREFERRED_OPSET = 7
 ONNX_UNKNOWN_DIMENSION = -1
 
+DOMAIN = "ai.kaldi2onnx"
+PRODUCER = "kaldi2onnx"
 
 class Graph(object):
 
@@ -70,8 +72,8 @@ class Graph(object):
         self._chunk_size = chunk_size
         self._input_dims = input_dims
 
-        self._operatorsetid = "ai.kaldi2onnx.xiaomi"
-        self._producer_name = "kaldi2onnx-nnet" + str(nnet_type)
+        self._operatorsetid = DOMAIN
+        self._producer_name = PRODUCER + "-nnet" + str(nnet_type)
         self._producer_version = "1.0"
 
         self._replace_input_tensors = {}
@@ -159,7 +161,7 @@ class Graph(object):
         self._outputs.extend(outputs)
         self._outputs = list(set(self._outputs))
 
-    def reorder_nodes(self):
+    def reorder_nodes(self, ifdefine=True):
         updated_nodes = []
         checked_names = []
         checked_names.extend(self._inputs)
@@ -170,7 +172,7 @@ class Graph(object):
                     required_inputs = [input for input in node.inputs
                                        if input not in node.consts]
                     if set(required_inputs) <= set(checked_names) or \
-                            node.type == KaldiOpType.IfDefined.name:
+                            (node.type == KaldiOpType.IfDefined.name and ifdefine):
                         updated_nodes.append(node)
                         checked_names.append(node.name)
         self._nodes = updated_nodes
@@ -188,7 +190,8 @@ class Graph(object):
 
     def init_inputs(self):
         for name in self._inputs:
-            self.add_placeholder_op(name)
+            if name not in self._consts:
+                self.add_placeholder_op(name)
 
     def infer_shapes(self):
         for node in self._nodes:
@@ -342,7 +345,7 @@ class Graph(object):
         self.remove_outputs()
         self.add_new_nodes(fused_nodes)
         self.update_input_output_tensors()
-        self.reorder_nodes()
+        self.reorder_nodes(False)
 
     def update_nodes_by_name(self):
         for node in self._nodes:
@@ -353,7 +356,7 @@ class Graph(object):
         input = lstm_node.inputs[0]
         if input in self._nodes_by_name:
             append_a = self._nodes_by_name[input]
-            if append_a.type == KaldiOpType.Append.name and \
+            if append_a.type == KaldiOpType.Concat.name and \
                     len(append_a.inputs) == 2:
                 sup_affine_name = append_a.inputs[0]
                 sup_ifdef_a_name = append_a.inputs[1]
@@ -361,12 +364,12 @@ class Graph(object):
                         sup_ifdef_a_name in self._nodes_by_name:
                     affine = self._nodes_by_name[sup_affine_name]
                     ifdef_a = self._nodes_by_name[sup_ifdef_a_name]
-                    if (affine.type == KaldiOpType.Affine.name and
+                    if (affine.type == KaldiOpType.Gemm.name and
                             ifdef_a.type == KaldiOpType.IfDefined.name):
                         ifdef_inputs.append(ifdef_a.inputs[0])
                         if affine.inputs[0] in self._nodes_by_name:
                             append_b = self._nodes_by_name[affine.inputs[0]]
-                            if append_b.type == KaldiOpType.Append.name and \
+                            if append_b.type == KaldiOpType.Concat.name and \
                                     len(append_b.inputs) == 2:
                                 input_name = append_b.inputs[0]
                                 ifdef_b_name = append_b.inputs[1]
@@ -396,12 +399,12 @@ class Graph(object):
                             slice_b.nexts[0] in self._nodes_by_name:
                         left_node = self._nodes_by_name[slice_a.nexts[0]]
                         right_node = self._nodes_by_name[slice_b.nexts[0]]
-                        if (left_node.type == KaldiOpType.Affine.name and
-                            right_node.type == KaldiOpType.Append.name) or \
-                                (left_node.type == KaldiOpType.Append.name and
-                                 right_node.type == KaldiOpType.Affine.name):
-                            if left_node.type == KaldiOpType.Affine.name and \
-                                    right_node.type == KaldiOpType.Append.name:
+                        if (left_node.type == KaldiOpType.Gemm.name and
+                            right_node.type == KaldiOpType.Concat.name) or \
+                                (left_node.type == KaldiOpType.Concat.name and
+                                 right_node.type == KaldiOpType.Gemm.name):
+                            if left_node.type == KaldiOpType.Gemm.name and \
+                                    right_node.type == KaldiOpType.Concat.name:
                                 append_node = right_node
                                 affine_node = left_node
                                 nodes_after_lstm.append(slice_a)
@@ -604,7 +607,7 @@ class Graph(object):
 
     def reset_append_input_index(self):
         for node in self._nodes:
-            if node.type == KaldiOpType.Append.name:
+            if node.type == KaldiOpType.Concat.name:
                 input_nodes = self.get_input_nodes(node)
                 for in_node in input_nodes:
                     if in_node.type in [KaldiOpType.ReplaceIndex.name,
@@ -702,6 +705,7 @@ class Graph(object):
                                                  input_names,
                                                  output_names,
                                                  name=node.name,
+                                                 domain=self._operatorsetid,
                                                  **node.attrs)
                     onnx_nodes.append(onnx_node)
                 except Exception as ex:
@@ -757,6 +761,7 @@ class Graph(object):
             opsets.extend(self._extra_opset)
         kwargs["opset_imports"] = opsets
         model_proto = helper.make_model(graph, **kwargs)
+        checker.check_model(model_proto)
         return model_proto
 
     @property
@@ -766,36 +771,6 @@ class Graph(object):
     @property
     def initializers(self):
         return self._initializers
-
-    def is_target(self, name):
-        return name in self._target
-
-    def is_initializer(self, name):
-        return name in self._initializers
-
-    def set_initializer(self, name, val):
-        self._initializers[name] = val
-
-    def get_initializer(self, name):
-        if self.is_initializer(name):
-            return self._initializers[name]
-        raise ValueError("no initializer called" + name)
-
-    def update_initializer(self, name, tensor):
-        if self.is_initializer(name):
-            new_tensor = numpy_helper.from_array(tensor, name)
-            if new_tensor.dims != self._initializers[name].dims:
-                self.set_shape(name, new_tensor.dims)
-            del self._initializers[name]
-            self._initializers[name] = new_tensor
-        else:
-            raise ValueError("no initializer called" + name)
-
-    def get_dtype(self, name):
-        return self._dtypes.get(name)
-
-    def set_dtype(self, name, dtype):
-        self._dtypes[name] = dtype
 
     def set_shape(self, name, val):
         if isinstance(val, np.ndarray):

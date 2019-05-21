@@ -45,8 +45,10 @@ def merge_two_dicts(x, y):
 def check_is_continous(nums, up=True):
     kaldi_check(isinstance(nums, list),
                 "Only supports check_is_continous in a list.")
-    kaldi_check(nums >= 2,
-                "input list should have at least two items.")
+    kaldi_check(len(nums) >= 1,
+                "input list should have at least one item.")
+    if len(nums) == 1:
+        return nums
     pre = nums[0]
     for i in range(1, len(nums)):
         if up:
@@ -71,8 +73,10 @@ def fetch_origin_input(input_str):
 def splice_continous_numbers(nums):
     kaldi_check(isinstance(nums, list),
                 "Only supports splice_continous_numbers in a list.")
-    kaldi_check(len(nums) >= 2,
-                "input list should have at least two items.")
+    kaldi_check(len(nums) >= 1,
+                "input list should have at least one item.")
+    if len(nums) == 1:
+        return nums
     new_nums = list()
     first = nums[0]
     pre = nums[0]
