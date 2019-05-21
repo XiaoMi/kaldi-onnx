@@ -17,13 +17,16 @@ converter.graph - class to manage graph manipulation on top of ONNX
 """
 
 from __future__ import division
-from __future__ import print_function
 from __future__ import unicode_literals
+
+import logging
 
 import numpy as np
 from onnx import defs, helper, checker, numpy_helper, optimizer, OperatorSetIdProto, onnx_pb
 import six
 from node import *
+
+_LOG = logging.getLogger(__name__)
 
 INTERNAL_NAME = 1
 PREFERRED_OPSET = 7
@@ -111,7 +114,7 @@ class Graph(object):
         # add placeholders
         self.init_inputs()
         # make onnx model
-        print("model has %s nodes." % len(self._nodes))
+        _LOG.info("model has %s nodes." % len(self._nodes))
         onnx_model = self.make_model()
         return onnx_model
 
@@ -137,9 +140,9 @@ class Graph(object):
                     self._nodes_by_name[node_name] = padding_node
 
     def print_graph_info(self):
-        print("graph shapes:")
+        _LOG.info("graph shapes:")
         for s in self._shapes:
-            print(s, ":", self._shapes[s])
+            _LOG.info(s, ":", self._shapes[s])
         for node in self._nodes:
             node.info()
 
@@ -226,7 +229,7 @@ class Graph(object):
                           lstm_input,
                           nodes_before,
                           nodes_after):
-        print("Fuse LstmNonlinear.")
+        _LOG.info("Fuse LstmNonlinear.")
         first_ifdef = nodes_before[0]
         offset_a = first_ifdef.read_attribute('offset')
         first_affine = nodes_before[2]
@@ -460,7 +463,7 @@ class Graph(object):
     def check_fuse_extraction_pooling_round(self, node):
         extract_pooling_pack = self.check_extraction_pooling_round(node)
         if extract_pooling_pack is not None:
-            print("Fuse Extraction/Pooling/Round to ExtractPooling.")
+            _LOG.info("Fuse Extraction/Pooling/Round to ExtractPooling.")
             extraction_node = extract_pooling_pack[0]
             pooling_node = extract_pooling_pack[1]
             round_node = extract_pooling_pack[2]
@@ -602,7 +605,7 @@ class Graph(object):
                     break
         self._left_context = left_context
         self._right_context = right_context
-        print("left_context: %s, right context: %s"
+        _LOG.info("left_context: %s, right context: %s"
               % (left_context, right_context))
 
     def reset_append_input_index(self):
@@ -686,7 +689,7 @@ class Graph(object):
         return onnx_tensor
 
     def make_model(self):
-        print("start making ONNX model.")
+        _LOG.info("start making ONNX model.")
         output_tensor_values = []
         for name in self._outputs:
             v = helper.make_tensor_value_info(

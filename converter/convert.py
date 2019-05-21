@@ -20,9 +20,7 @@ python convert.py --input=path/to/kaldi_model.mdl \
                   --fuse-lstm=(true or false, default is true) \
                   --fuse-stats=(true or false, default is true)
 """
-
-from __future__ import print_function
-
+import logging
 import argparse, os, six
 from graph import Graph
 from parser import Nnet2Parser, Nnet3Parser
@@ -193,10 +191,14 @@ def main():
                 output_path = output_path[0] + '.onnx'
             with open(output_path, "wb") as of:
                 of.write(onnx_model.SerializeToString())
-                print("Kaldi to ONNX converting finished!")
-                print("The new onnx model file is:", output_path)
+                logging.info("Kaldi to ONNX converting finished!")
+                logging.info("The new onnx model file is:", output_path)
     else:
         raise Exception("invalid input file path: {0}.".format(args.input))
 
+
 if __name__ == "__main__":
+    logging.basicConfig(format="%(asctime)s %(name)s %(levelname)s %(message)s",
+                        level=logging.INFO)
+
     main()
