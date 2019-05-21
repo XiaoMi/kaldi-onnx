@@ -17,14 +17,17 @@ python parser.py --input=path/to/kaldi_model.mdl --nnet-type=(2 or 3)
 """
 
 from __future__ import division
-from __future__ import print_function
 from __future__ import unicode_literals
 
 import argparse
+import logging
+
 from common import *
 from utils import *
 import re
 import sys
+
+_LOG = logging.getLogger(__name__)
 
 
 class Nnet2Parser(object):
@@ -171,7 +174,7 @@ class Nnet2Parser(object):
         line, pos = self.check_header(line, pos)
         self.parse_component_lines(line, pos)
         self.add_input_node()
-        print("finished parse nnet2 (%s) components." %
+        _LOG.info("finished parse nnet2 (%s) components." %
               len(self._components))
         return self._components
 
@@ -199,7 +202,7 @@ class Nnet2Parser(object):
             if tok == "</Components>":
                 break
             elif tok == NNet2End:
-                print("finished parse nnet2 components.")
+                _LOG.info("finished parse nnet2 components.")
                 break
             elif tok[1:-1] in self._component_actions:
                 component_type = tok[1:-1]
@@ -587,7 +590,7 @@ class Nnet3Parser(object):
 
     def print_components_info(self):
         for component in self._components:
-            print(component)
+            _LOG.info(component)
 
     def check_header(self):
         line = next(self._line_buffer)
@@ -1007,7 +1010,7 @@ class Nnet3Parser(object):
                 line = next(self._line_buffer)
                 pos = 0
                 if line is None:
-                    print("unexpected EOF on line:\n", line)
+                    _LOG.error("unexpected EOF on line:\n {}".format(line))
                     break
                 else:
                     tok, pos = read_next_token(line, pos)
@@ -1027,21 +1030,20 @@ class Nnet3Parser(object):
                         self._components_by_name[component_name] = new_dict
                         num += 1
                 else:
-                    print("{0}: error reading component with name {1}"
+                    _LOG.error("{0}: error reading component with name {1}"
                           " at position {2}"
                           .format(sys.argv[0],
                                   component_name,
-                                  component_pos),
-                          file=sys.stderr)
+                                  component_pos))
             elif tok == NNet3End:
-                print("finished parsing nnet3 (%s) components." % num)
+                _LOG.info("finished parsing nnet3 (%s) components." % num)
                 assert num == self._num_components
                 break
             else:
-                print("{0}: error reading Component:"
+                _LOG.error("{0}: error reading Component:"
                       " at position {1}, expected <ComponentName>,"
                       " got: {2}"
-                      .format(sys.argv[0], pos, tok), file=sys.stderr)
+                      .format(sys.argv[0], pos, tok))
                 break
 
     def read_component(self, line, pos, component_type):
@@ -1061,7 +1063,7 @@ class Nnet3Parser(object):
                 d['raw-type'] = component_type[1:-10]  # e.g. 'Linear'
             return d, line, pos
         else:
-            print("Component: %s not supported yet." % type)
+            _LOG.info("Component: %s not supported yet." % type)
             return None, line, pos
 
     @staticmethod
@@ -1083,11 +1085,10 @@ class Nnet3Parser(object):
             if tok is None:
                 line = next(line_buffer)
                 if line is None:
-                    print("{0}: error reading object starting at position {1},"
+                    _LOG.error("{0}: error reading object starting at position {1},"
                           " got EOF "
                           "while expecting one of: {2}"
-                          .format(sys.argv[0], orig_pos, terminating_tokens),
-                          file=sys.stderr)
+                          .format(sys.argv[0], orig_pos, terminating_tokens))
                     break
                 else:
                     pos = 0
@@ -1152,8 +1153,9 @@ def main():
                 parser = Nnet2Parser(f)
             parser.run()
     else:
-        print("invalid file path ", args.input)
+        _LOG.error("invalid file path {}".format(args.input))
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()

@@ -11,11 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-from __future__ import print_function
-
 import sys
+import logging
+
 import numpy as np
+
+_LOG = logging.getLogger(__name__)
 
 def kaldi_check(condition, msg):
     if not condition:
@@ -95,8 +96,7 @@ def splice_continous_numbers(nums):
 def consume_token(token, line, pos):
     """Return line without token"""
     if token != line.split(None, 1)[0]:
-        print("Unexpected token, expected '%s', got '%s'."
-              % (token, line.split(None, 1)[0]))
+        _LOG.error("Unexpected token, expected '%s', got '%s'." % (token, line.split(None, 1)[0]))
 
     return line.partition(token)[2]
 
@@ -122,8 +122,8 @@ def read_float(line, pos, line_buffer):
     try:
         f = float(tok)
     except:
-        print("{0}: at line position {1}, expected float but got {2}"
-              .format(sys.argv[0], pos, tok), file=sys.stderr)
+        _LOG.error("{0}: at line position {1}, expected float but got {2}"
+                   .format(sys.argv[0], pos, tok))
     return f, pos
 
 
@@ -133,7 +133,7 @@ def read_int(line, pos, line_buffer):
     try:
         i = int(tok)
     except:
-        print("at file position %s, expected int but got %s" % (pos, tok))
+        _LOG.error("at file position %s, expected int but got %s" % (pos, tok))
     return i, pos
 
 
@@ -145,15 +145,15 @@ def read_bool(line, pos, line_buffer):
     elif tok in['T', 'True', 'true']:
         b = True
     else:
-        print("at file position %s, expected bool but got %s" % (pos, tok))
+        _LOG.error("at file position %s, expected bool but got %s" % (pos, tok))
     return b, pos
 
 
 def read_vector(line, pos, line_buffer):
     tok, pos = read_next_token(line, pos)
     if tok != '[':
-        print("{0}: at line position {1}, expected [ but got {2}"
-              .format(sys.argv[0], pos, tok), file=sys.stderr)
+        _LOG.error("{0}: at line position {1}, expected [ but got {2}"
+                   .format(sys.argv[0], pos, tok), file=sys.stderr)
         return None, pos
     v = []
     while True:
@@ -163,7 +163,7 @@ def read_vector(line, pos, line_buffer):
         if tok is None:
             line = next(line_buffer)
             if line is None:
-                print("encountered EOF while reading vector.")
+                _LOG.error("encountered EOF while reading vector.")
                 break
             else:
                 pos = 0
@@ -172,12 +172,12 @@ def read_vector(line, pos, line_buffer):
             f = float(tok)
             v.append(f)
         except:
-            print("{0}: at line position {1}, reading vector,"
-                  " expected vector but got {2}"
+            _LOG.error("{0}: at line position {1}, reading vector,"
+                       " expected vector but got {2}"
                   .format(sys.argv[0], pos, tok), file=sys.stderr)
             return None, pos
     if tok is None:
-        print("encountered EOF while reading vector.")
+        _LOG.error("encountered EOF while reading vector.")
         return None, pos
 
     return np.array(v, dtype=np.float32), pos
@@ -186,7 +186,7 @@ def read_vector(line, pos, line_buffer):
 def read_vector_int(line, pos, line_buffer):
     tok, pos = read_next_token(line, pos)
     if tok != '[':
-        print("{0}: at line position {1}, expected [ but got {2}"
+        _LOG.error("{0}: at line position {1}, expected [ but got {2}"
               .format(sys.argv[0], pos, tok), file=sys.stderr)
         return None, pos
     v = []
@@ -197,7 +197,7 @@ def read_vector_int(line, pos, line_buffer):
         if tok is None:
             line = next(line_buffer)
             if line is None:
-                print("encountered EOF while reading vector.")
+                _LOG.error("encountered EOF while reading vector.")
                 break
             else:
                 pos = 0
@@ -206,12 +206,12 @@ def read_vector_int(line, pos, line_buffer):
             i = int(tok)
             v.append(i)
         except:
-            print("{0}: at line position {1}, reading vector,"
+            _LOG.error("{0}: at line position {1}, reading vector,"
                   " expected float but got {2}"
                   .format(sys.argv[0], pos, tok), file=sys.stderr)
             return None, pos
     if tok is None:
-        print("encountered EOF while reading vector.")
+        _LOG.error("encountered EOF while reading vector.")
         return None, pos
 
     return np.array(v, dtype=np.int), pos
@@ -231,7 +231,7 @@ def check_for_newline(s, pos):
 def read_matrix(line, pos, line_buffer):
     tok, pos = read_next_token(line, pos)
     if tok != '[':
-        print("{0}: at line position {1}, reading vector,"
+        _LOG.error("{0}: at line position {1}, reading vector,"
               " expected '[' but got {2}"
               .format(sys.argv[0], pos, tok), file=sys.stderr)
         return None, pos
@@ -252,7 +252,7 @@ def read_matrix(line, pos, line_buffer):
                     f = float(tok)
                     v.append(f)
                 except:
-                    print("{0}: at line position {1}, reading vector,"
+                    _LOG.error("{0}: at line position {1}, reading vector,"
                           "expected float but got {2}"
                           .format(sys.argv[0], pos, tok), file=sys.stderr)
                     return None, pos
@@ -267,7 +267,7 @@ def read_matrix(line, pos, line_buffer):
         if tok is None:
             line = next(line_buffer)
             if line is None:
-                print("{0}: at line position {1}, reading vector,"
+                _LOG.error("{0}: at line position {1}, reading vector,"
                       " expected ']' but got end of lines"
                       .format(sys.argv[0], pos), file=sys.stderr)
                 break
@@ -279,7 +279,7 @@ def read_matrix(line, pos, line_buffer):
         ans_mat = np.array(m, dtype=np.float32)
     except:
         if tok is None:
-            print("{0}: at line position {1}, reading vector,"
+            _LOG.error("{0}: at line position {1}, reading vector,"
                   " expected float but got {2}"
                   .format(sys.argv[0], pos, tok), file=sys.stderr)
     return ans_mat, pos
@@ -293,9 +293,9 @@ def is_component_type(component_type):
 def read_component_type(line, pos):
     component_type, pos = read_next_token(line, pos)
     if not is_component_type(component_type):
-        print("{0}: error reading Component: at position {1},"
+        _LOG.error("{0}: error reading Component: at position {1},"
               " expected <xxxxComponent>,"
-              " got: {2}".format(sys.argv[0], pos, component_type), file=sys.stderr)
+              " got: {2}".format(sys.argv[0], pos, component_type))
         while True:
             tok, pos = read_next_token(line, pos)
 
@@ -322,11 +322,10 @@ def read_generic(line, pos, line_buffer, terminating_token, action_dict):
             if tok is None:
                 line = next(line_buffer)
                 if line is None:
-                    print("{0}: error reading object starting at position {1},"
+                    _LOG.error("{0}: error reading object starting at position {1},"
                           "got EOF "
                           "while expecting one of: {2}"
-                          .format(sys.argv[0], orig_pos, terminating_tokens),
-                          file=sys.stderr)
+                          .format(sys.argv[0], orig_pos, terminating_tokens))
                     break
                 else:
                     pos = 0
