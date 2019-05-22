@@ -168,7 +168,8 @@ python tools/converter.py run --config=path/to/fisher_english.yml --validate
 
 ## 交流与反馈
 * 欢迎通过Github Issues提交问题报告与建议
-
+* 欢迎提交代码，代码格式请遵照[PEP8风格Python代码规范](https://www.python.org/dev/peps/pep-0008/),
+  可以使用[pycodestyle](https://github.com/PyCQA/pycodestyle)工具进行检查 `pycodestyle $(find . -name "*.py")`。
 
 ## License
 [Apache License 2.0](LICENSE)

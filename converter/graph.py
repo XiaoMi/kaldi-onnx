@@ -29,7 +29,7 @@ INTERNAL_NAME = 1
 PREFERRED_OPSET = 7
 ONNX_UNKNOWN_DIMENSION = -1
 
-DOMAIN = "ai.kaldi2onnx"
+DOMAIN = "ai.kaldi.dnn"
 PRODUCER = "kaldi2onnx"
 
 
@@ -797,7 +797,7 @@ class Graph(object):
             internal_inputs.append(val)
 
         graph = helper.make_graph(onnx_nodes,
-                                  "kaldi2onnx",
+                                  self._producer_name,
                                   input_with_initializers,
                                   output_tensor_values,
                                   initializer=initializers,
