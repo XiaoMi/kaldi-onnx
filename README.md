@@ -198,6 +198,15 @@ We have converted numbers of Kaldi's Nnet2 and Nnet3 models, and put them in [MA
 
 
 ## Contributing
+
+Python code should conform to [PEP8 Style Guide for Python Code](https://www.python.org/dev/peps/pep-0008/).
+
+You can use [pycodestyle](https://github.com/PyCQA/pycodestyle) to check the style.
+
+```commandline
+pycodestyle $(find . -name "*.py")
+```
+
 Any kind of contribution is welcome. For bug reports, feature requests,
 please just open an issue without any hesitation. For code contributions, it's
 strongly suggested to open an issue for discussion first.
