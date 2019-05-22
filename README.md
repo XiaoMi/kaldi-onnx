@@ -1,6 +1,7 @@
 # Kaldi-ONNX Converter
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+[![Build Status](https://api.travis-ci.org/XiaoMi/kaldi-onnx.svg?branch=master)](https://travis-ci.org/XiaoMi/kaldi-onnx)
 
 [English](README.md) | [中文](README_zh.md)
 
