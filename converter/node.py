@@ -36,8 +36,8 @@ def make_node(name, type, inputs, attrs=None, consts=None):
         return ConstantNode(name, type, inputs, attrs, consts)
     elif type == KaldiOpType.Conv1d.name:
         return Conv1dNode(name, type, inputs, attrs, consts)
-    elif type == KaldiOpType.Convolution.name:
-        return ConvolutionNode(name, type, inputs, attrs, consts)
+    elif type == KaldiOpType.Conv.name:
+        return ConvNode(name, type, inputs, attrs, consts)
     elif type == KaldiOpType.Dct.name:
         return DCTNode(name, type, inputs, attrs, consts)
     elif type == KaldiOpType.DynamicLSTM.name:
@@ -406,7 +406,7 @@ class Conv1dNode(Node):
         self.output_shape = output_shape
 
 
-class ConvolutionNode(Node):
+class ConvNode(Node):
 
     def infer_shape(self, shapes):
         kaldi_check(self.inputs[0] in shapes,
