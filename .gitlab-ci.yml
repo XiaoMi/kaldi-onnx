@@ -1,0 +1,33 @@
+stages:
+  - prepare
+  - linting
+  - test
+
+setenv:
+  stage: prepare
+  script:
+    - pip install -I "onnx==1.5.0" "numpy==1.14.1" "six==1.11.0" "setuptools==18.5"
+
+pylint:
+  stage: linting
+  script:
+    - pycodestyle $(find -name "*.py")
+
+model_test:
+  stage: test
+  script:
+    - echo 'Test Convertion'
+    - echo 'Testing converting nnet2 model librispeech'
+    - mkdir temp && cd temp
+    - wget https://cnbj1.fds.api.xiaomi.com/mace/kaldi-onnx/librispeech_final.mdl
+    - python ../converter/convert.py --input=librispeech_final.mdl --chunk-size=21 --left-context=7 --right-context=7 --nnet-type=2
+    - rm -rf librispeech_final.*
+    - echo 'Testing converting nnet2 model sre16'
+    - wget https://cnbj1.fds.api.xiaomi.com/mace/kaldi-onnx/sre_16.mdl
+    - python ../converter/convert.py --input=sre_16.mdl --chunk-size=21 --left-context=0 --right-context=7 --nnet-type=3
+    - rm -rf sre_16.*
+    - echo 'Testing converting nnet2 model sre16'
+    - wget https://cnbj1.fds.api.xiaomi.com/mace/kaldi-onnx/stats.mdl
+    - python ../converter/convert.py --input=stats.mdl --chunk-size=20 --left-context=24 --right-context=46 --modulus=18 --nnet-type=3
+    - rm -rf stats.*
+    - cd ../ && rm -rf temp

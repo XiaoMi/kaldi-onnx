@@ -11,6 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+from __future__ import division
+from __future__ import print_function
+
 import sys
 import logging
 
@@ -374,3 +378,9 @@ def parenthesis_split(sentence,
         raise Exception("Syntax error")
 
     return [sentence[i:j].strip(separator) for i, j in zip(ln, ln[1:])]
+
+
+def save_lines_to_file(lines, file_path):
+    with open(file_path, 'w') as f:
+        for item in lines:
+            f.write("%s\n" % item)

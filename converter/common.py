@@ -14,17 +14,21 @@
 
 from enum import Enum
 
+MaxChunkSize = 500
 DefaultChunkSize = 20
 DefaultBatch = 1
 
 NNet2 = 2
 NNet3 = 3
 
-NNet2Header = "<Nnet>"
-NNet2End = "</Nnet>"
+Nnet2Header = "<Nnet>"
+Nnet2End = "</Nnet>"
 
-NNet3Header = "<Nnet3>"
-NNet3End = "</Nnet3>"
+TransModelHeader = '<TransitionModel>'
+TransModelEnd = '</TransitionModel>'
+
+Nnet3Header = "<Nnet3>"
+Nnet3End = "</Nnet3>"
 
 INPUT_NAME = "input"
 IVECTOR_NAME = "ivector"
@@ -32,10 +36,11 @@ IVECTOR_NAME = "ivector"
 KaldiOps = [
     'AdditiveNoise',
     'Gemm',
-    'Concat',
+    'Append',
     'BatchNorm',
     'Bias',
     'ClipGradient',
+    'Identity',  # for next chunk's computaion, need to cache the node's output
     'Constant',
     'ConstantFunction',
     'Conv1d',
@@ -58,7 +63,6 @@ KaldiOps = [
     'NoOp',
     'TargetRMSNorm',
     'Offset',
-    'PadContext',
     'PerEltOffset',
     'PerEltScale',
     'Permute',
@@ -79,6 +83,7 @@ KaldiOps = [
     'SpliceMax',
     'StatisticsExtraction',
     'StatisticsPooling',
+    'Subsample',  # add subsample node to support chain models
     'Sum',
     'SumBlock',
     'SumGroup',
@@ -291,7 +296,11 @@ ATTRIBUTE_NAMES = {
                            'keep_dct_dim'],
     KaldiOpType.Distribute.name: ['input_dim', 'output_dim'],
     KaldiOpType.Dropout.name: ['dim'],
-    KaldiOpType.ReplaceIndex.name: ['var_name', 'value'],
+    KaldiOpType.ReplaceIndex.name: ['var_name',
+                                    'value',
+                                    'chunk_size',
+                                    'left_context',
+                                    'right_context'],
     KaldiOpType.DimRange.name: ['dim', 'offset'],
     KaldiOpType.IfDefined.name: ['offset'],
     KaldiOpType.Linear.name: ['rank_inout',

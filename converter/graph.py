@@ -16,6 +16,9 @@
 converter.graph - class to manage graph manipulation on top of ONNX
 """
 
+from __future__ import division
+from __future__ import print_function
+
 import logging
 import six
 import numpy as np
@@ -41,101 +44,306 @@ class Graph(object):
                  outputs,
                  batch,
                  chunk_size,
+                 left_context,
+                 right_context,
+                 modulus,
                  input_dims,
+                 subsample_factor,
                  nnet_type,
-                 fuse_lstm,
-                 fuse_stats,
+                 fuse_lstm=True,
+                 fuse_stats=True,
                  target=None,
                  opset=None,
                  extra_opst=None):
-        if target is None:
-            target = []
-        self._target = set(target)
         self._nodes = nodes
         self._nodes_by_name = {}
 
         self._fuse_lstm = fuse_lstm
         self._fuse_stats = fuse_stats
 
-        self.update_nodes_by_name()
-        self._initializers = {}
         self._shapes = dict()
         self._consts = dict()
-        self._model_inputs = {}
+        self._model_inputs = inputs
+        self._model_outputs = outputs
         self._inputs = inputs
-
         self._outputs = outputs
-
-        self._opset = self.find_opset(opset)
-        self._extra_opset = extra_opst
+        self._model_input_tensors = dict()
 
         self._batch = batch
         self._chunk_size = chunk_size
+        self._left_context = left_context
+        self._right_context = right_context
+        self._modulus = modulus
+        self._subsample_factor = subsample_factor
         self._input_dims = input_dims
 
+        self._dims_by_name = dict()
+        self._indexes_by_name = dict()
+        self._dependencies_by_name = dict()
+
+        # for onnx model
+        if target is None:
+            target = []
+        self._target = set(target)
+        self._initializers = {}
+        self._opset = self.find_opset(opset)
+        self._extra_opset = extra_opst
         self._operatorsetid = DOMAIN
         self._producer_name = PRODUCER + "-nnet" + str(nnet_type)
-        self._producer_version = "1.0"
+        self._producer_version = "1.1"
 
-        self._replace_input_tensors = {}
-        self._replace_output_tensors = {}
-        self._remove_nodes = []
-        self._remove_inputs = []
-        self._remove_outputs = []
+    def model_interface_info(self):
+        self.fetch_model_inputs_outputs()
+        input_info = dict()
+        cache_info = dict()
+        output_info = dict()
+        for input in self._model_inputs:
+            if input.endswith('.IfDefined'):
+                orig_input = input.replace('.IfDefined', '')
+                if orig_input in self._model_outputs:
+                    cache_info[orig_input] = self._shapes[orig_input]
+                else:
+                    input_info[orig_input] = self._shapes[input]
+            else:
+                input_info[input] = self._shapes[input]
 
-        self._left_context = 0
-        self._right_context = 0
-
-        self._need_check_output_indexes = False
+        for output in self._model_outputs:
+            if output not in cache_info:
+                output_info[output] = self._shapes[output]
+        return input_info, output_info, cache_info
 
     def run(self):
-        # copy all nodes' consts into _const and save their shapes in _shapes
-        self.get_consts()
-        # double check inputs and outputs
-        self.update_input_outputs()
-        # make nodes in order
-        self.reorder_nodes()
-        # compute left context and right context
-        self.compute_context()
-        # add PadContext for 'input' if the model has left or right context
-        self.add_padding_node()
-        # fuse statistics extraction and pooling, lstm cell
-        self.fuse_nodes()
-        # init input shapes
-        self.init_input_shape()
-        # some node needs to get some params before inference running,
-        # like StatisticsExtraction, StatisticsPooling,
-        #  or their's fused ExtractPooling
+        self.prepare_graph()
+        # do some inference
+        self.inference_input_ranges()
+        self.inference_dependencies()
+        self.inference_indexes()
+        self.add_subsample_nodes()
         self.precompute()
-        # infer shapes in order
-        self.infer_shapes()
-        # add placeholders
-        self.init_inputs()
+        self.inference_dims()
+        self.inference_shapes()
         # make onnx model
         _LOG.info("model has %s nodes." % len(self._nodes))
         onnx_model = self.make_model()
         return onnx_model
 
-    def add_padding_node(self):
-        if self._left_context > 0 or self._right_context > 0:
-            for input in self._inputs:
-                if input in[INPUT_NAME, '0']:
-                    node_name = input + '_pad_context'
-                    inputs = [input]
-                    attrs = {
-                        'left_context': self._left_context,
-                        'right_context': self._right_context,
-                    }
-                    padding_node = make_node(node_name,
-                                             KaldiOpType.PadContext.name,
-                                             inputs,
-                                             attrs)
-                    for node in self._nodes:
-                        if input in node.inputs:
-                            node.inputs = [node_name if item == input else item
-                                           for item in node.inputs]
-                    self._nodes.insert(0, padding_node)
-                    self._nodes_by_name[node_name] = padding_node
+    def prepare_graph(self):
+        _LOG.info("Prepare Graph.")
+        # copy all nodes' consts into self._consts and
+        # save their shapes in self._shapes
+        self.get_consts()
+        # check inputs and outputs
+        self.fetch_inputs_outputs()
+        # make nodes in order and update nodes_by_name
+        self.reorder_nodes()
+        self.update_nodes_by_name()
+        # add PadContext for 'input' if the model has left or right context
+        # fuse statistics extraction and pooling, lstm cell
+        self.fuse_nodes()
+        self.add_cache_nodes()
+        self.fetch_model_inputs_outputs()
+
+    def add_subsample_nodes(self):
+        subsample_nodes = dict()
+        if self._subsample_factor > 1:
+            for node in self._nodes:
+                if node.is_simple():
+                    input_indexes = node.input_indexes
+                    output_indexes = node.output_indexes
+                    if len(output_indexes) < len(input_indexes):
+                        input_name = node.inputs[0]
+                        subsample_name = input + '.subsample.' + node.name
+                        if subsample_name not in subsample_nodes:
+                            subsample_inputs = [input_name]
+                            attrs = {}
+                            subsample_node = \
+                                make_node(subsample_name,
+                                          KaldiOpType.Subsample.name,
+                                          subsample_inputs,
+                                          [subsample_name], attrs)
+                            subsample_node.input_indexes = input_indexes
+                            subsample_node.output_indexes = output_indexes
+                            subsample_nodes[subsample_name] = subsample_node
+                        else:
+                            subsample_node = subsample_nodes[subsample_name]
+                            if set(output_indexes) != \
+                                    set(subsample_node.output_indexes):
+                                subsample_inputs = [input]
+                                attrs = {}
+                                subsample_name = node.name + subsample_name
+                                subsample_node = \
+                                    make_node(subsample_name,
+                                              KaldiOpType.Subsample.name,
+                                              subsample_inputs,
+                                              [subsample_name], attrs)
+                                subsample_node.input_indexes = input_indexes
+                                subsample_node.output_indexes = output_indexes
+                                subsample_nodes[subsample_name] = \
+                                    subsample_node
+                        node.input_indexes = output_indexes
+                        node.inputs[0] = subsample_name
+                elif node.type == KaldiOpType.Append.name:
+                    dependencies = node.dependencies
+                    for i in range(len(node.inputs)):
+                        input = node.inputs[i]
+                        if input in self._nodes_by_name or \
+                                input in self._indexes_by_name:
+                            if input in self._nodes_by_name:
+                                input_node = self._nodes_by_name[input]
+                                output_indexes = input_node.output_indexes
+                            else:
+                                output_indexes = self._indexes_by_name[input]
+                            if set(dependencies) < set(output_indexes):
+                                subsample_name = \
+                                        input + '.subsample.' + node.name
+                                if subsample_name not in subsample_nodes:
+                                    subsample_inputs = [input]
+                                    attrs = {}
+                                    subsample_node = \
+                                        make_node(subsample_name,
+                                                  KaldiOpType.Subsample.name,
+                                                  subsample_inputs,
+                                                  [subsample_name], attrs)
+                                    subsample_node.input_indexes = \
+                                        output_indexes
+                                    subsample_node.output_indexes = \
+                                        dependencies
+                                    subsample_node.dependencies = \
+                                        output_indexes
+                                    node.input_indexes = dependencies
+                                    node.inputs[i] = subsample_name
+                                    subsample_nodes[subsample_name] = \
+                                        subsample_node
+        if len(subsample_nodes) > 0:
+            for name, node in subsample_nodes.items():
+                self._nodes.append(node)
+                self._nodes_by_name[name] = node
+            self.fetch_inputs_outputs()
+            self.reorder_nodes()
+
+    def add_cache_nodes(self):
+        cache_nodes = list()
+        for node in self._nodes:
+            input = node.inputs[0]
+            if node.type == KaldiOpType.IfDefined.name and \
+                    not input.endswith('.IfDefined'):
+                if input in self._nodes_by_name:
+                    input_node = self._nodes_by_name[input]
+                    cache_node_name = input_node.name + '.Cache'
+                    cache_inputs = [input_node.name]
+                    cache_node = make_node(cache_node_name,
+                                           KaldiOpType.Identity.name,
+                                           cache_inputs,
+                                           [cache_node_name])
+                    cache_nodes.append(cache_node)
+                    node.inputs.append(cache_node_name + '.IfDefined')
+                else:
+                    cache_node_name = input + '.Cache'
+                    cache_inputs = [input]
+                    cache_node = make_node(cache_node_name,
+                                           KaldiOpType.Identity.name,
+                                           cache_inputs,
+                                           [cache_node_name])
+                    node.inputs.append(cache_node_name + '.IfDefined')
+                    cache_nodes.append(cache_node)
+        if len(cache_nodes) > 0:
+            self._nodes.extend(cache_nodes)
+            self.fetch_inputs_outputs()
+            self.reorder_nodes()
+
+    def get_consts(self):
+        for node in self._nodes:
+            for const_name, const in node.consts.items():
+                self._consts[const_name] = const
+                self._shapes[const_name] = const.shape
+
+    def init_indexes_by_name(self):
+        input_start_idx = -self._left_context
+        input_end_idx = self._chunk_size + self._right_context - 1
+        for name in self._inputs:
+            if name in [INPUT_NAME, '0']:
+                indexes = list()
+                for i in range(input_start_idx,
+                               input_end_idx + 1):
+                    indexes.append(i)
+                self._indexes_by_name[name] = indexes
+            elif name == IVECTOR_NAME:
+                start = self._chunk_size * (
+                        input_start_idx // self._chunk_size)
+                end = self._chunk_size * (input_end_idx // self._chunk_size)
+                indexes = [i for i in range(start, end + 1, self._chunk_size)]
+                self._indexes_by_name[name] = indexes
+
+    def inference_dims(self):
+        _LOG.info("Inference dims")
+        kaldi_check(INPUT_NAME or '0' in self._input_dims,
+                    "cannot find input dim.")
+        self._dims_by_name.update(self._input_dims)
+        for node in self._nodes:
+            node.inference_dim(self._dims_by_name, self._nodes_by_name)
+
+    def inference_input_ranges(self):
+        input_start_idx = -self._left_context
+        input_end_idx = self._chunk_size + self._right_context - 1
+        ranges_by_name = dict()
+        input_range = [input_start_idx, input_end_idx]
+        ranges_by_name[INPUT_NAME] = input_range
+        ranges_by_name['0'] = input_range
+        if IVECTOR_NAME in self._inputs:
+            start = self._chunk_size * (input_start_idx // self._chunk_size)
+            end = self._chunk_size * (input_end_idx // self._chunk_size)
+            end += self._chunk_size - 1
+            ranges_by_name[IVECTOR_NAME] = [start, end]
+        for node in self._nodes:
+            node.inference_range(ranges_by_name, self._nodes_by_name)
+
+    def infer_node_dependencies(self, node, output_indexes):
+        node.inference_dependencies(output_indexes,
+                                    self._dependencies_by_name,
+                                    self._nodes_by_name,
+                                    self._subsample_factor)
+        if node.type == KaldiOpType.IfDefined.name:
+            current_dependencies = node.output_indexes
+        else:
+            current_dependencies = node.dependencies
+        for input in node.inputs:
+            if input.endswith('.IfDefined'):
+                input_name = input.replace('.IfDefined', '')
+            else:
+                input_name = input
+            if input_name in self._nodes_by_name:
+                input_node = self._nodes_by_name[input_name]
+                checked = \
+                    set(current_dependencies) <= set(input_node.output_indexes)
+                checked = checked and len(input_node.dependencies) > 0
+                if not checked or input_name not in self._dependencies_by_name:
+                    self.infer_node_dependencies(input_node,
+                                                 current_dependencies)
+
+    def inference_dependencies(self):
+        _LOG.info("Inference dependencies.")
+        final_output_indexes = self.init_output_indexes()
+        for name in self._model_outputs:
+            output_indexes = final_output_indexes
+            if name in self._nodes_by_name and \
+                    name + '.IfDefined' not in self._inputs:
+                node = self._nodes_by_name[name]
+                self.infer_node_dependencies(node, output_indexes)
+
+    def inference_indexes(self):
+        _LOG.info("Inference indexes")
+        self.init_indexes_by_name()
+        for node in self._nodes:
+            node.inference_index(self._indexes_by_name,
+                                 self._nodes_by_name)
+
+    def init_output_indexes(self):
+        output_indexes = list()
+        i = 0
+        while i < self._chunk_size:
+            output_indexes.append(i)
+            i += self._subsample_factor
+        return output_indexes
 
     def print_graph_info(self):
         _LOG.info("graph shapes:")
@@ -144,13 +352,9 @@ class Graph(object):
         for node in self._nodes:
             node.info()
 
-    def get_consts(self):
-        for node in self._nodes:
-            for const_name, const in node.consts.items():
-                self._consts[const_name] = const
-                self._shapes[const_name] = const.shape
-
-    def update_input_outputs(self):
+    def fetch_inputs_outputs(self):
+        self._inputs = list()
+        self._outputs = list()
         all_inputs = []
         all_outputs = []
         for node in self._nodes:
@@ -162,23 +366,44 @@ class Graph(object):
         self._outputs.extend(outputs)
         self._outputs = list(set(self._outputs))
 
+    def fetch_model_inputs_outputs(self):
+        self._model_inputs = list()
+        self._model_outputs = list()
+        all_inputs = []
+        all_outputs = []
+        for node in self._nodes:
+            for input in node.inputs:
+                if input not in self._consts:
+                    all_inputs.append(input)
+            all_outputs.extend(node.outputs)
+        self._model_inputs = [i for i in all_inputs
+                              if i not in all_outputs]
+        outputs = [i for i in all_outputs if i not in all_inputs]
+        self._model_inputs = list(set(self._model_inputs))
+        self._model_outputs.extend(outputs)
+        self._model_outputs = list(set(self._model_outputs))
+
     def reorder_nodes(self, ifdefine=True):
         updated_nodes = []
         checked_names = []
         checked_names.extend(self._inputs)
+        nodes_need_check = self._nodes[:]
 
-        while len(updated_nodes) < len(self._nodes):
-            for node in self._nodes:
-                if node not in updated_nodes:
-                    required_inputs = [input for input in node.inputs
-                                       if input not in node.consts]
-                    if set(required_inputs) <= set(checked_names) or \
-                            (node.type == KaldiOpType.IfDefined.name and
-                             ifdefine):
-                        updated_nodes.append(node)
-                        checked_names.append(node.name)
+        while len(nodes_need_check) > 0:
+            for node in nodes_need_check:
+                depend_inputs = [input for input in node.inputs
+                                 if input not in node.consts]
+                if set(depend_inputs) <= set(checked_names)\
+                        or (node.type == KaldiOpType.IfDefined.name
+                            and ifdefine and 'IfDefined' in node.inputs[0]):
+                    updated_nodes.append(node)
+                    checked_names.append(node.name)
+                    nodes_need_check.remove(node)
         self._nodes = updated_nodes
         for node in self._nodes:
+            del node.nexts[:]
+        for node in self._nodes:
+            self._nodes_by_name[node.name] = node
             for input in node.inputs:
                 if input in self._nodes_by_name:
                     input_node = self._nodes_by_name[input]
@@ -186,44 +411,23 @@ class Graph(object):
 
     def init_input_shape(self):
         for name in self._inputs:
-            chunk = 1 if name == IVECTOR_NAME else self._chunk_size
-            if name in self._input_dims:
+            if name in [IVECTOR_NAME, INPUT_NAME, '0']:
                 self._shapes[name] = [self._batch,
-                                      chunk, self._input_dims[name]]
+                                      len(self._indexes_by_name[name]),
+                                      self._input_dims[name]]
 
     def init_inputs(self):
         for name in self._inputs:
             if name not in self._consts:
                 self.add_placeholder_op(name)
 
-    def infer_shapes(self):
+    def inference_shapes(self):
+        _LOG.info("Inference shapes")
+        self.init_input_shape()
         for node in self._nodes:
-            node.infer_shape(self._shapes)
-            if node.output_shape is not None:
-                self._shapes[node.name] = node.output_shape
-        # need to fetch 'IfDefined's input shape from another inference
-        self.check_ifdef_shape()
-
-    def check_ifdef_shape(self):
-        for node in self._nodes:
-            if node.type == KaldiOpType.IfDefined.name and\
-                    node.name not in self._shapes:
-                if node.inputs[0] not in self._shapes:
-                    origin_index = node.inputs[0].find('.IfDefined')
-                    origin_input = node.inputs[0][0: origin_index]
-                    if origin_input in self._shapes:
-                        self._shapes[node.inputs[0]
-                                     ] = self._shapes[origin_input]
-                node.infer_shape(self._shapes)
-                if node.output_shape is not None:
-                    self._shapes[node.name] = node.output_shape
-                else:
-                    node.info()
-                for next in node.nexts:
-                    next_node = self._nodes_by_name[next]
-                    next_node.infer_shape(self._shapes)
-                    if next_node.output_shape is not None:
-                        self._shapes[next_node.name] = next_node.output_shape
+            node.inference_shape(self._batch,
+                                 self._shapes,
+                                 self._nodes_by_name)
 
     def fuse_dynamic_lstm(self,
                           node,
@@ -231,12 +435,15 @@ class Graph(object):
                           nodes_before,
                           nodes_after):
         _LOG.info("Fuse LstmNonlinear.")
-        first_ifdef = nodes_before[0]
-        offset_a = first_ifdef.read_attribute('offset')
+        out_ifdef = nodes_before[0]
+        offset_out = out_ifdef.read_attribute('offset')
+        prev_out_name = out_ifdef.inputs[0]
+
         first_affine = nodes_before[2]
 
-        second_ifdef = nodes_before[3]
-        offset_b = second_ifdef.read_attribute('offset')
+        cell_ifdef = nodes_before[3]
+        offset_cell = cell_ifdef.read_attribute('offset')
+        prev_cell_name = cell_ifdef.inputs[0]
 
         second_affine = nodes_after[2]
         scale_node = nodes_after[-3]
@@ -244,24 +451,29 @@ class Graph(object):
 
         inputs = list()
         inputs.append(lstm_input)
+        inputs.append(out_ifdef.inputs[0])
+        inputs.append(cell_ifdef.inputs[0])
         inputs.append(first_affine.inputs[1])
         inputs.append(node.inputs[1])
         inputs.append(second_affine.inputs[1])
 
-        prev_a = nodes_after[-2]
-        prev_b = nodes_after[-1]
-        prev_a_dim = prev_a.read_attribute('dim')
-        prev_b_dim = prev_b.read_attribute('dim')
+        prev_cell = nodes_after[-2]
+        prev_out = nodes_after[-1]
 
-        prev_out_offset = prev_b.read_attribute('offset')
+        prev_cell_dim = prev_cell.read_attribute('dim')
+        prev_out_dim = prev_out.read_attribute('dim')
+
+        out_dimrange = nodes_after[3]
+        prev_out_offset = out_dimrange.read_attribute('offset')
 
         lstm_attrs = dict()
-        lstm_attrs['prev_out_delay'] = offset_a
-        lstm_attrs['prev_cell_delay'] = offset_b
+        lstm_attrs['prev_out_delay'] = offset_out
+        lstm_attrs['prev_cell_delay'] = offset_cell
         lstm_attrs['scale'] = scale
-        lstm_attrs['prev_out_dim'] = prev_a_dim
-        lstm_attrs['prev_cell_dim'] = prev_b_dim
+        lstm_attrs['prev_out_dim'] = prev_out_dim
+        lstm_attrs['prev_cell_dim'] = prev_cell_dim
         lstm_attrs['prev_out_offset'] = prev_out_offset
+        lstm_attrs['chunk_size'] = self._chunk_size
 
         if len(first_affine.inputs) == 3:
             inputs.append(first_affine.inputs[2])
@@ -277,51 +489,31 @@ class Graph(object):
             if input in self._consts:
                 consts[input] = self._consts[input]
 
+        outputs = list()
+        outputs.append(node_name)
+        outputs.append(prev_out_name.replace(".IfDefined", ""))
+        outputs.append(prev_cell_name.replace(".IfDefined", ""))
+
+        prev_cell_shape = [self._batch, abs(offset_cell), prev_cell_dim]
+        prev_out_shape = [self._batch, abs(offset_out), prev_out_dim]
+
+        self._shapes[inputs[1]] = prev_out_shape
+        self._shapes[inputs[2]] = prev_cell_shape
+        self._shapes[outputs[1]] = prev_out_shape
+        self._shapes[outputs[2]] = prev_cell_shape
+
         dynamic_lstm_node = make_node(node_name,
                                       KaldiOpType.DynamicLSTM.name,
                                       inputs,
+                                      outputs,
                                       lstm_attrs,
                                       consts)
         return dynamic_lstm_node
 
-    def remove_inputs(self):
-        new_inputs = [ipt for ipt in self._inputs
-                      if ipt not in self._remove_inputs]
-        self._inputs = new_inputs
-
-    def remove_outputs(self):
-        new_outputs = [opt for opt in self._outputs
-                       if opt not in self._remove_outputs]
-        self._outputs = new_outputs
-
-    def safe_remove_node(self, node):
-        for output in node.nexts:
-            output_node = self._nodes_by_name[output]
-            previous_inputs = [input for input in node.inputs
-                               if input not in self._consts]
-            new_inputs = []
-            for input in output_node.inputs:
-                if input == node.name:
-                    new_inputs.extend(previous_inputs)
-                else:
-                    new_inputs.append(input)
-            output_node.inputs = new_inputs
-        del self._nodes_by_name[node.name]
-        self._nodes.remove(node)
-
-    def remove_nodes(self):
+    def remove_nodes(self, nodes_to_remove):
         self._nodes_by_name.clear()
-        new_nodes = []
-        for node in self._nodes:
-            if node not in self._remove_nodes:
-                new_nodes.append(node)
-                self._nodes_by_name[node.name] = node
-            else:
-                for input in node.inputs:
-                    if input in self._inputs:
-                        self._remove_inputs.append(input)
-                    if node.name in self._outputs:
-                        self._remove_outputs.append(node.name)
+        new_nodes = [node for node in self._nodes
+                     if node not in nodes_to_remove]
         self._nodes = new_nodes
 
     def add_new_nodes(self, new_nodes):
@@ -329,32 +521,33 @@ class Graph(object):
             kaldi_check(node.name not in self._nodes,
                         "Node(%s) is already in graph." % node.name)
             self._nodes.append(node)
-            self._nodes_by_name[node.name] = node
 
-    def update_input_output_tensors(self):
+    def replace_inputs_outputs(self, inputs_to_replace, outputs_to_replace):
         for node in self._nodes:
             for i in range(len(node.inputs)):
-                if node.inputs[i] in self._replace_input_tensors:
-                    node.inputs[i] =\
-                        self._replace_input_tensors[node.inputs[i]]
+                if node.inputs[i] in inputs_to_replace:
+                    node.inputs[i] = inputs_to_replace[node.inputs[i]]
             for i in range(len(node.nexts)):
-                if node.nexts[i] in self._replace_output_tensors:
-                    node.nexts[i] =\
-                        self._replace_output_tensors[node.nexts[i]]
+                if node.nexts[i] in outputs_to_replace:
+                    node.nexts[i] = outputs_to_replace[node.nexts[i]]
         for i in range(len(self._outputs)):
-            if self._outputs[i] in self._replace_input_tensors:
-                self._outputs[i] =\
-                    self._replace_input_tensors[self._outputs[i]]
+            if self._outputs[i] in inputs_to_replace:
+                self._outputs[i] = inputs_to_replace[self._outputs[i]]
 
-    def update_with_fused_nodes(self, fused_nodes):
-        self.remove_nodes()
-        self.remove_inputs()
-        self.remove_outputs()
+    def update_with_fused_nodes(self,
+                                fused_nodes,
+                                nodes_to_remove,
+                                outputs_to_replace,
+                                inputs_to_replace):
+        self.remove_nodes(nodes_to_remove)
         self.add_new_nodes(fused_nodes)
-        self.update_input_output_tensors()
+        self.replace_inputs_outputs(inputs_to_replace,
+                                    outputs_to_replace)
+        self.update_nodes_by_name()
         self.reorder_nodes(False)
 
     def update_nodes_by_name(self):
+        self._nodes_by_name.clear()
         for node in self._nodes:
             self._nodes_by_name[node.name] = node
 
@@ -364,7 +557,7 @@ class Graph(object):
         if input not in self._nodes_by_name:
             return False, None, None, None
         append_a = self._nodes_by_name[input]
-        if append_a.type != KaldiOpType.Concat.name or\
+        if append_a.type != KaldiOpType.Append.name or \
                 len(append_a.inputs) != 2:
             return False, None, None, None
         sup_affine_name = append_a.inputs[0]
@@ -374,14 +567,14 @@ class Graph(object):
             return False, None, None, None
         affine = self._nodes_by_name[sup_affine_name]
         ifdef_a = self._nodes_by_name[sup_ifdef_a_name]
-        if affine.type != KaldiOpType.Gemm.name or\
+        if affine.type != KaldiOpType.Gemm.name or \
                 ifdef_a.type != KaldiOpType.IfDefined.name:
             return False, None, None, None
         ifdef_inputs.append(ifdef_a.inputs[0])
         if affine.inputs[0] not in self._nodes_by_name:
             return False, None, None, None
         append_b = self._nodes_by_name[affine.inputs[0]]
-        if append_b.type != KaldiOpType.Concat.name or \
+        if append_b.type != KaldiOpType.Append.name or \
                 len(append_b.inputs) != 2:
             return False, None, None, None
         input_name = append_b.inputs[0]
@@ -401,33 +594,33 @@ class Graph(object):
                         nodes_before)
         return False, None, None, None
 
-    def check_after_lstm(self, lstm_node, if_def_inputs):
+    def check_after_lstm(self, lstm_node, ifdef_inputs):
         nodes_after = []
         if len(lstm_node.nexts) != 2:
             return False, None, None
         slice_a_name = lstm_node.nexts[0]
         slice_b_name = lstm_node.nexts[1]
-        if slice_a_name not in self._nodes_by_name or\
+        if slice_a_name not in self._nodes_by_name or \
                 slice_b_name not in self._nodes_by_name:
             return False, None, None
         slice_a = self._nodes_by_name[slice_a_name]
         slice_b = self._nodes_by_name[slice_b_name]
-        if slice_a.type != KaldiOpType.DimRange.name or\
+        if slice_a.type != KaldiOpType.DimRange.name or \
                 slice_b.type != KaldiOpType.DimRange.name:
             return False, None, None
-        if slice_a.nexts[0] not in self._nodes_by_name or\
+        if slice_a.nexts[0] not in self._nodes_by_name or \
                 slice_b.nexts[0] not in self._nodes_by_name:
             return False, None, None
         left_node = self._nodes_by_name[slice_a.nexts[0]]
         right_node = self._nodes_by_name[slice_b.nexts[0]]
         check_left_right = (left_node.type == KaldiOpType.Gemm.name and
-                            right_node.type == KaldiOpType.Concat.name) or\
-                           (left_node.type == KaldiOpType.Concat.name and
+                            right_node.type == KaldiOpType.Append.name) or \
+                           (left_node.type == KaldiOpType.Append.name and
                             right_node.type == KaldiOpType.Gemm.name)
         if check_left_right is False:
             return False, None, None
-        if left_node.type == KaldiOpType.Gemm.name and\
-                right_node.type == KaldiOpType.Concat.name:
+        if left_node.type == KaldiOpType.Gemm.name and \
+                right_node.type == KaldiOpType.Append.name:
             append_node = right_node
             affine_node = left_node
             nodes_after.append(slice_a)
@@ -444,60 +637,64 @@ class Graph(object):
             dim_range_b_name = append_node.inputs[0]
         else:
             dim_range_b_name = append_node.inputs[1]
-        if dim_range_b_name not in affine_node.nexts or\
+        if dim_range_b_name not in affine_node.nexts or \
                 append_node.nexts[0] not in self._nodes_by_name:
             return False, None, None
         nodes_after.append(self._nodes_by_name[dim_range_b_name])
         nodes_after.append(append_node)
         scale_node = self._nodes_by_name[append_node.nexts[0]]
-        if scale_node.type != KaldiOpType.Scale.name or\
+        if scale_node.type != KaldiOpType.Scale.name or \
                 len(scale_node.nexts) != 2:
             return False, None, None
         nodes_after.append(scale_node)
-        if scale_node.nexts[0] not in self._nodes_by_name or\
+        if scale_node.nexts[0] not in self._nodes_by_name or \
                 scale_node.nexts[1] not in self._nodes_by_name:
             return False, None, None
         last_dim_range_0 = self._nodes_by_name[scale_node.nexts[0]]
         last_dim_range_1 = self._nodes_by_name[scale_node.nexts[1]]
-        if last_dim_range_0.type != KaldiOpType.DimRange.name or\
+        if last_dim_range_0.type != KaldiOpType.DimRange.name or \
                 last_dim_range_1.type != KaldiOpType.DimRange.name:
             return False, None, None
-        nodes_after.append(last_dim_range_0)
-        nodes_after.append(last_dim_range_1)
-        if (last_dim_range_0.name in if_def_inputs or
-            last_dim_range_0.name + '.IfDefined' in if_def_inputs) and\
-                (last_dim_range_1.name in if_def_inputs or
-                 last_dim_range_1.name + '.IfDefined' in if_def_inputs):
+        if (last_dim_range_0.name in ifdef_inputs or
+            last_dim_range_0.name + '.IfDefined' in ifdef_inputs) and \
+                (last_dim_range_1.name in ifdef_inputs or
+                 last_dim_range_1.name + '.IfDefined' in ifdef_inputs):
+            if last_dim_range_0.name == ifdef_inputs[0] or \
+                    last_dim_range_0.name + '.IfDefined' == ifdef_inputs[0]:
+                nodes_after.append(last_dim_range_0)
+                nodes_after.append(last_dim_range_1)
+            else:
+                nodes_after.append(last_dim_range_1)
+                nodes_after.append(last_dim_range_0)
             return True, affine_node.name, nodes_after
         return False, None, None
 
-    def check_extraction_pooling_round(self, node):
+    def check_extraction_pooling(self, node):
         if len(node.inputs) != 1:
+            _LOG.info(node.name, "Inputs > 1 ")
             return None
         input_name = node.inputs[0]
         if input_name not in self._nodes_by_name:
+            _LOG.info(input_name, "not in nodes by name ")
             return None
         extraction_node = self._nodes_by_name[input_name]
-        if extraction_node.type !=\
+        if extraction_node.type != \
                 KaldiOpType.StatisticsExtraction.name:
+            _LOG.info(input_name, "is not StatisticsExtraction.")
             return None
-        if len(node.nexts) != 1:
+        if len(node.nexts) == 1:
+            return [extraction_node, node]
+        else:
+            _LOG.info("nexts > 1.")
             return None
-        next_name = node.nexts[0]
-        if next_name not in self._nodes_by_name:
-            return None
-        round_node = self._nodes_by_name[next_name]
-        if round_node.type == KaldiOpType.Round.name:
-            return [extraction_node, node, round_node]
-        return None
 
-    def check_fuse_extraction_pooling_round(self, node):
-        extract_pooling_pack = self.check_extraction_pooling_round(node)
+    def check_fuse_extraction_pooling(self, node):
+        extract_pooling_pack = self.check_extraction_pooling(node)
         if extract_pooling_pack is not None:
-            _LOG.info("Fuse Extraction/Pooling/Round to ExtractPooling.")
+            _LOG.info("Fuse StatisticsExtraction/StatisticsPooling "
+                      "to ExtractPooling.")
             extraction_node = extract_pooling_pack[0]
             pooling_node = extract_pooling_pack[1]
-            round_node = extract_pooling_pack[2]
 
             extract_input_dim = extraction_node.read_attribute('input_dim')
             extract_input_period = extraction_node.read_attribute(
@@ -518,10 +715,7 @@ class Graph(object):
                         "StatisticsExtraction's output period should"
                         " be equal to StatisticsPooling's input period.")
 
-            round_modulus = round_node.read_attribute('modulus')
-
             extract_pooling_attrs = {
-                'modulus': round_modulus,
                 'input_period': extract_input_period,
                 'output_period': extract_output_period,
                 'include_variance': include_variance,
@@ -537,176 +731,61 @@ class Graph(object):
             inputs = extraction_node.inputs
             extract_pooling_node = make_node(node_name,
                                              KaldiOpType.ExtractPooling.name,
-                                             inputs,
+                                             inputs, [node_name],
                                              extract_pooling_attrs)
-
-            self._replace_output_tensors[extraction_node.name] = node_name
-            self._replace_input_tensors[round_node.name] = node_name
-            self._remove_nodes.extend(extract_pooling_pack)
-            return extract_pooling_node
-        return None
+            return extract_pooling_node, extract_pooling_pack
+        return None, None
 
     def fuse_nodes(self):
         fused_nodes = []
+        nodes_to_remove = list()
+        outputs_to_replace = dict()
+        inputs_to_replace = dict()
         for node in self._nodes:
             if node.type == KaldiOpType.StatisticsPooling.name and\
                     self._fuse_stats:
-                extract_pooling_node =\
-                    self.check_fuse_extraction_pooling_round(node)
+                extract_pooling_node, extract_pooling_pack = \
+                    self.check_fuse_extraction_pooling(node)
                 if extract_pooling_node is not None:
-                    self._need_check_output_indexes = True
                     fused_nodes.append(extract_pooling_node)
-            elif node.type == KaldiOpType.LstmNonlinear.name and\
+                    extraction_node = extract_pooling_pack[0]
+                    pooling_node = extract_pooling_pack[1]
+                    outputs_to_replace[extraction_node.name] = \
+                        extract_pooling_node.name
+                    inputs_to_replace[pooling_node.name] = \
+                        extract_pooling_node.name
+                    nodes_to_remove.extend(extract_pooling_pack)
+            elif node.type == KaldiOpType.LstmNonlinear.name and \
                     self._fuse_lstm:
-                check_before, lstm_input, ifdef_inputs, nodes_before =\
+                check_before, lstm_input, ifdef_inputs, nodes_before = \
                     self.check_before_lstm(node)
                 if check_before:
-                    check_after, lstm_output, nodes_after =\
+                    check_after, lstm_output, nodes_after = \
                         self.check_after_lstm(node, ifdef_inputs)
                     if check_after:
-                        dynamic_lstm_node =\
+                        dynamic_lstm_node = \
                             self.fuse_dynamic_lstm(node,
                                                    lstm_input,
                                                    nodes_before,
                                                    nodes_after)
-                        self._replace_output_tensors[lstm_input] =\
+                        outputs_to_replace[lstm_input] = \
                             dynamic_lstm_node.name
-                        self._replace_input_tensors[lstm_output] =\
+                        inputs_to_replace[lstm_output] = \
                             dynamic_lstm_node.name
-                        self._remove_nodes.extend(nodes_before)
-                        self._remove_nodes.append(node)
-                        self._remove_nodes.extend(nodes_after)
+                        nodes_to_remove.extend(nodes_before)
+                        nodes_to_remove.append(node)
+                        nodes_to_remove.extend(nodes_after)
                         fused_nodes.append(dynamic_lstm_node)
         if len(fused_nodes) > 0:
-            self.update_with_fused_nodes(fused_nodes)
-
-    def remove_node(self, node):
-        remove_node_name = node.mame
-        replace_node_name = node.inputs[0]
-        for nd in self._nodes:
-            inputs = nd.inputs
-            inputs[:] = [x
-                         if x != remove_node_name
-                         else replace_node_name
-                         for x in inputs]
-            nd.inputs = inputs
-
-    def get_input_nodes(self, node):
-        input_nodes = []
-        for input in node.inputs:
-            if input in self._nodes_by_name:
-                input_nodes.append(
-                    self._nodes_by_name[input])
-        return input_nodes
-
-    @staticmethod
-    def map_to_input(node, start, end):
-        node.map_to_input(start, end)
-        node.start_index = start
-        node.end_index = end
-
-    def check_output_indexes(self):
-        if self._need_check_output_indexes is False:
-            return
-        for output in self._outputs:
-            if output in self._nodes_by_name:
-                start = 0
-                end = self._chunk_size - 1
-                node = self._nodes_by_name[output]
-                if node.start_index != start or node.end_index != end:
-                    self.map_to_input(node, start, end)
-                    [start, end] = node.read_attribute('input_time_range')
-                    input_nodes = self.get_input_nodes(node)
-                    is_continue = True
-                    while len(input_nodes) == 1 and is_continue:
-                        n = input_nodes[0]
-                        self.map_to_input(n, start, end)
-                        [start, end] = n.read_attribute('input_time_range')
-                        input_nodes = self.get_input_nodes(n)
-                        if n.type == KaldiOpType.ExtractPooling.name:
-                            is_continue = False
+            self.update_with_fused_nodes(fused_nodes,
+                                         nodes_to_remove,
+                                         outputs_to_replace,
+                                         inputs_to_replace)
 
     def precompute(self):
-        input_indexes = self.get_input_indexes(0, self._chunk_size)
-        self.infer_time_index(input_indexes, save_index=True)
-        self.reset_append_input_index()
-        self.check_output_indexes()
+        _LOG.info("Precompute")
         for node in self._nodes:
             node.precompute()
-
-    def compute_context(self):
-        left_context = 0
-        right_context = 0
-        window_size = 100
-        while True:
-            check_left, check_right = self.evaluate_time_index(left_context,
-                                                               right_context,
-                                                               window_size)
-            if check_left is False:
-                left_context += 1
-            else:
-                if check_right is False:
-                    right_context += 1
-                else:
-                    break
-        self._left_context = left_context
-        self._right_context = right_context
-        _LOG.info("left_context: %s, right context: %s"
-                  % (left_context, right_context))
-
-    def reset_append_input_index(self):
-        for node in self._nodes:
-            if node.type == KaldiOpType.Concat.name:
-                input_nodes = self.get_input_nodes(node)
-                for in_node in input_nodes:
-                    if in_node.type in [KaldiOpType.ReplaceIndex.name,
-                                        KaldiOpType.Round.name,
-                                        KaldiOpType.ExtractPooling.name,
-                                        KaldiOpType.IfDefined.name]:
-                        in_node.start_index = node.start_index
-                        in_node.end_index = node.end_index
-
-    def get_input_indexes(self, start, end):
-        input_indexes = [t for t in range(start, end)]
-        indexes_by_name = {}
-        for input in self._inputs:
-            if input in[INPUT_NAME, '0']:
-                indexes_by_name[input] = input_indexes
-            else:
-                indexes_by_name[input] = [0]
-        return indexes_by_name
-
-    def infer_time_index(self, input_indexes, save_index=False):
-        for node in self._nodes:
-            output_indexes = node.infer_index(input_indexes, save_index)
-            input_indexes[node.name] = output_indexes
-
-            if len(output_indexes) == 0 or\
-                    output_indexes[0] > output_indexes[-1]:
-                return False
-        return True
-
-    def evaluate_time_index(self,
-                            left_context,
-                            right_context,
-                            window_size=100):
-        indexes_by_name = self.get_input_indexes(-left_context,
-                                                 window_size + right_context)
-        if self.infer_time_index(indexes_by_name) is False:
-            return False, False
-
-        check_left = True
-        check_right = True
-        for output in self._outputs:
-            if output not in indexes_by_name:
-                return False, False
-            else:
-                output_indexes = indexes_by_name[output]
-                start = output_indexes[0]
-                end = output_indexes[-1]
-                check_left = check_left and (start <= 0)
-                check_right = check_right and (end >= (window_size - 1))
-        return check_left, check_right
 
     def convert_initializers(self):
         for const_name in self._consts:
@@ -740,6 +819,8 @@ class Graph(object):
 
     def make_model(self):
         _LOG.info("start making ONNX model.")
+        # add placeholders
+        self.init_inputs()
         output_tensor_values = []
         for name in self._outputs:
             v = helper.make_tensor_value_info(
@@ -784,7 +865,8 @@ class Graph(object):
                                                     initializer.dims))
             input_with_initializers.append(val)
             initializers_names.append(initializer.name)
-        input_with_initializers.extend(list(self._model_inputs.values()))
+        input_with_initializers.extend(
+            list(self._model_input_tensors.values()))
         input_tensors_names = [i for i in all_inputs
                                if i not in initializers_names or
                                i not in self._inputs]
@@ -802,7 +884,11 @@ class Graph(object):
                                   output_tensor_values,
                                   initializer=initializers,
                                   value_info=internal_inputs)
-
+        metadata_props = {"left_context": str(self._left_context),
+                          "right_context": str(self._right_context),
+                          "chunk_size": str(self._chunk_size),
+                          "modulus": str(self._modulus),
+                          "subsample_factor": str(self._subsample_factor)}
         kwargs = {"producer_name": self._producer_name,
                   "producer_version": self._producer_version}
         opsets = []
@@ -814,6 +900,7 @@ class Graph(object):
             opsets.extend(self._extra_opset)
         kwargs["opset_imports"] = opsets
         model_proto = helper.make_model(graph, **kwargs)
+        helper.set_model_props(model_proto, metadata_props)
         checker.check_model(model_proto)
         return model_proto
 
@@ -864,7 +951,7 @@ class Graph(object):
         self.add_model_input(name, input_node)
 
     def add_model_input(self, name, tensor_value_info):
-        if name not in self._model_inputs:
-            self._model_inputs[name] = tensor_value_info
+        if name not in self._model_input_tensors:
+            self._model_input_tensors[name] = tensor_value_info
         else:
-            raise ValueError("model input already exist.")
+            raise ValueError("model input tensor already exists.")

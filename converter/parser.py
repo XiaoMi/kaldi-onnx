@@ -16,6 +16,9 @@
 python parser.py --input=path/to/kaldi_model.mdl --nnet-type=(2 or 3)
 """
 
+from __future__ import division
+from __future__ import print_function
+
 import argparse
 import logging
 import re
@@ -189,7 +192,7 @@ class Nnet2Parser(object):
         self._nodes = []
         self._num_components = 0
         self._line_buffer = line_buffer
-        # self._transition_model = []
+        self._transition_model = []
 
     def run(self):
         line = next(self._line_buffer)
@@ -197,13 +200,13 @@ class Nnet2Parser(object):
         if line.startswith("<TransitionModel>"):
             self.parse_transition_model(line)
             line = next(self._line_buffer)
-        assert line.startswith(NNet2Header)
+        assert line.startswith(Nnet2Header)
         line, pos = self.check_header(line, pos)
         self.parse_component_lines(line, pos)
         self.add_input_node()
         _LOG.info("finished parse nnet2 (%s) components." %
                   len(self._components))
-        return self._components
+        return self._components, self._transition_model
 
     def add_input_node(self):
         first_component = self._components[0]
@@ -228,7 +231,7 @@ class Nnet2Parser(object):
             tok, pos = read_next_token(line, pos)
             if tok == "</Components>":
                 break
-            elif tok == NNet2End:
+            elif tok == Nnet2End:
                 _LOG.info("finished parse nnet2 components.")
                 break
             elif tok[1:-1] in self._component_actions:
@@ -263,17 +266,17 @@ class Nnet2Parser(object):
         return op_dict, line, pos
 
     def parse_transition_model(self, line):
-        # self._transition_model.append(line)
+        self._transition_model.append(line)
         while True:
             line = next(self._line_buffer)
-            # self._transition_model.append(line)
+            self._transition_model.append(line)
             if line.startswith("</TransitionModel>"):
                 break
 
     # parse nnet header and get components number
     def check_header(self, line, pos):
         tok, pos = read_next_token(line, pos)
-        assert(tok == NNet2Header)
+        assert(tok == Nnet2Header)
         tok, pos = read_next_token(line, pos)
         assert(tok == '<NumComponents>')
         num_components, pos = read_int(line, pos, self._line_buffer)
@@ -605,23 +608,37 @@ class Nnet3Parser(object):
         self._line_buffer = line_buffer
         self._pos = 0
         self._current_id = 0
+        self._transition_model = []
 
     def run(self):
-        self.check_header()
+        line = self.parse_transition_model()
+        self.check_header(line)
         self.parse_configs()
         self.parse_component_lines()
         self._components = []
         for component_name in self._components_by_name:
-            self._components.append(self._components_by_name[component_name])
-        return self._components
+            self._components.append(
+                self._components_by_name[component_name])
+        return self._components, self._transition_model
+
+    def parse_transition_model(self):
+        line = next(self._line_buffer)
+        if line.startswith("<TransitionModel>"):
+            self._transition_model.append(line)
+            while True:
+                line = next(self._line_buffer)
+                self._transition_model.append(line)
+                if line.startswith("</TransitionModel>"):
+                    line = next(self._line_buffer)
+                    break
+        return line
 
     def print_components_info(self):
         for component in self._components:
             _LOG.info(component)
 
-    def check_header(self):
-        line = next(self._line_buffer)
-        assert line.startswith(NNet3Header)
+    def check_header(self, line):
+        assert line.startswith(Nnet3Header)
 
     def parse_configs(self):
         while True:
@@ -753,7 +770,6 @@ class Nnet3Parser(object):
         pure_inputs = list(set(offset_inputs))
 
         if num_inputs == len(offset_inputs) and len(pure_inputs) == 1:
-            # print("Fuse Append to Splice 1.")
             self._current_id += 1
             comp_name = 'splice_' + str(self._current_id)
             component = {
@@ -769,7 +785,6 @@ class Nnet3Parser(object):
             splice_indexes = splice_continous_numbers(offset_indexes)
             if len(pure_inputs) == 1 and len(splice_indexes) == 1 and\
                     len(offset_inputs) > 1:
-                # print("Fuse Append to Splice 2.")
                 self._current_id += 1
                 splice_comp_name = 'splice_' + str(self._current_id)
                 splice_component = {
@@ -792,7 +807,7 @@ class Nnet3Parser(object):
             comp_name = 'append_' + str(self._current_id)
             component = {
                 'id': self._current_id,
-                'type': 'Concat',
+                'type': 'Append',
                 'name': comp_name,
                 'input': append_inputs}
             sub_components.append(component)
@@ -1009,6 +1024,7 @@ class Nnet3Parser(object):
                                                    items[0],
                                                    sub_components)
             else:
+                # input_name = items[0]
                 if items[0] in self._component_names:
                     input_name = items[0]
                 else:
@@ -1066,7 +1082,7 @@ class Nnet3Parser(object):
                                .format(sys.argv[0],
                                        component_name,
                                        component_pos))
-            elif tok == NNet3End:
+            elif tok == Nnet3End:
                 _LOG.info("finished parsing nnet3 (%s) components." % num)
                 assert num == self._num_components
                 break

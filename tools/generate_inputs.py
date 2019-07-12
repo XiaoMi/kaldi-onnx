@@ -12,8 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
-import os
+from __future__ import division
+from __future__ import print_function
+
 import argparse
 import numpy as np
 
@@ -22,6 +23,23 @@ def generate_features(batch, chunk, dim):
     data = np.random.rand(batch, chunk, dim)
     print "genearted data shape:", data.shape
     return data
+
+
+def pad_context(input_data,
+                left_context,
+                right_context):
+    if left_context > 0:
+        first = np.expand_dims(input_data[:, 0, :], axis=1)
+        first = np.repeat(first, left_context, axis=1)
+        out_data = np.concatenate((first, input_data), axis=1)
+    else:
+        out_data = input_data
+    if right_context > 0:
+        last = np.expand_dims(input_data[:, -1, :], axis=1)
+        last = np.repeat(last, right_context, axis=1)
+        out_data = np.concatenate((out_data, last), axis=1)
+    print "genearted padded context data shape:", out_data.shape
+    return out_data
 
 
 def save_mace_input(data, file_path):
@@ -48,14 +66,22 @@ def save_kaldi_input(data, shape, out_path):
 def get_args():
     """Parse commandline."""
     parser = argparse.ArgumentParser()
-    parser.add_argument('--input_dim', type=int, help='input dim', default=40)
-    parser.add_argument('--batch', type=int, help='batch size', default=1)
-    parser.add_argument('--chunk_size', type=int,
-                        help='chunk size', default=20)
-    parser.add_argument("--kaldi_input_file", required=True, type=str,
-                        help="kaldi input data file path")
-    parser.add_argument("--mace_input_file", required=True, type=str,
-                        help="mace input data file path")
+    parser.add_argument('--input-dim', type=int, dest='input_dim',
+                        help='input dim', default=40)
+    parser.add_argument('--batch', type=int, dest='batch',
+                        help='batch size', default=1)
+    parser.add_argument('--left-context', type=int, dest='left_context',
+                        help='left context', required=True)
+    parser.add_argument('--right-context', type=int, dest='right_context',
+                        help='right context size', required=True)
+    parser.add_argument('--chunk-size', type=int, dest='chunk_size',
+                        help='chunk size', required=True)
+    parser.add_argument("--kaldi-file", required=True, type=str,
+                        dest="kaldi_data_file",
+                        help="kaldi data file path")
+    parser.add_argument("--mace-file", required=True, type=str,
+                        dest="mace_data_file",
+                        help="mace data file path")
     args = parser.parse_args()
     return args
 
@@ -63,9 +89,10 @@ def get_args():
 def main():
     args = get_args()
     data = generate_features(args.batch, args.chunk_size, args.input_dim)
-    save_mace_input(data, args.mace_input_file)
     save_kaldi_input(data, [args.batch, args.chunk_size,
-                            args.input_dim], args.kaldi_input_file)
+                            args.input_dim], args.kaldi_data_file)
+    mace_data = pad_context(data, args.left_context, args.right_context)
+    save_mace_input(mace_data, args.mace_data_file)
 
 
 if __name__ == "__main__":

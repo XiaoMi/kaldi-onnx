@@ -30,7 +30,7 @@ pip install -r requirements.txt
 ### 2. Prepare models
 This tool only supports Kaldi's text model as an input.
 
-If you have a binary model, Kaldi's `nnet-am-copy` or `nnet3-am-copy` tool can help you get a text one:
+If you have a binary model, Kaldi's `nnet-am-copy` or `nnet3-copy` tool can help you get a text one:
 
 Nnet2 Model
 
@@ -42,13 +42,16 @@ path/to/kaldi/src/nnet2bin/nnet-am-copy --binary=false          \
 Nnet3 Model
 
 ```sh
-path/to/kaldi/src/nnet3bin/nnet3-am-copy --binary=false          \
-                                         --raw=true              \
-                                         --prepare-for-test=true \
-                                         final.raw text.mdl
+path/to/kaldi/src/nnet3bin/nnet3-copy --binary=false          \
+                                      --raw=true              \
+                                      --prepare-for-test=true \
+                                      final.raw text.mdl
 ```
 
 Don't forget to use the `--prepare-for-test=true` and `--raw=true`option to optimize the model.
+
+Before converting, you need to use `nnet-am-info` or `nnet3-am-info` to get left_context\right_context\modulus,
+which is required for converting.
 
 More details about kaldi's tools  are in [Kaldi's Documentation](http://kaldi-asr.org/doc/).
 
@@ -59,7 +62,13 @@ One command to convert:
 ```sh
 python converter/convert.py --input=models/kaldi/model_name.mdl  \
                             --output=models/onnx/model_name.onnx \
+                            --transition-model=path/to/save/transition_model.trans \
+                            --conf=path/to/save/configuration.conf \
                             --chunk-size=20 \
+                            --left-context=left_context \
+                            --right-context=right_context \
+                            --modulus=modulus \
+                            --subsample-factor=subsample_factor \
                             --nnet-type=3
 ```
 
@@ -88,10 +97,12 @@ The validation process is giving the same inputs to Kaldi and MACE's computation
 We provide a tool to generate the same random input data for Kaldi and MACE's computation.
 
 ```sh
-python tools/generate_inputs.py --input_dim=40 \
-                                --chunk_size=20 \
-                                --kaldi_input_file=path/to/kaldi/input/test_input.ark \
-                                --mace_input_file=path/to/mace/input/test_input.npy
+python tools/generate_inputs.py --input-dim=40 \
+                                --chunk-size=20 \
+                                --left-context=left_context \
+                                --right-context=right_contex \
+                                --kaldi-input_file=path/to/kaldi/input/test_input.ark \
+                                --mace-input_file=path/to/mace/input/test_input.npy
 
 ```
 'input_dim' and 'chunk_size' are model's input dim and chunk, can be specified by case.
@@ -104,7 +115,8 @@ Kaldi has command line tools for computing the model's propogation.
 Nnet2:
 
 ```sh
-path/to/kaldi/src/nnet2bin/nnet-am-compute  path/to/kaldi/model/file/final.mdl \
+path/to/kaldi/src/nnet2bin/nnet-am-compute  --chunk-size=chunk_size \
+                                            path/to/kaldi/model/file/final.mdl \
                                             ark,t:/path/to/kaldi/input/file/test_input.ark \
                                             ark,t:path/to/save/output/data/test_output.ark
 
@@ -113,7 +125,8 @@ path/to/kaldi/src/nnet2bin/nnet-am-compute  path/to/kaldi/model/file/final.mdl \
 Nnet3:
 
 ```sh
-path/to/kaldi/src/nnet3-compute  path/to/kaldi/model/file/final.mdl \
+path/to/kaldi/src/nnet3-compute  --frames-per-chunk=chunk_size \
+                                 path/to/kaldi/model/file/final.mdl \
                                  ark,t:/path/to/kaldi/input/file/test_input.ark \
                                  ark,t:path/to/save/output/data/test_output.ark
 
