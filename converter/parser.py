@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # Created by tz301
-"""parse nnet3 model."""
+"""Parse nnet3 model."""
 import re
 
 from converter.common import *
