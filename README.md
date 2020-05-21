@@ -18,7 +18,7 @@ The inference of Kaldi's most popular TDNN-F networks in nnet3 is supported.
 
 ### 1. Environment
 
-python3.6
+python3.6.8
 
 ### 2. Dependencies
 
