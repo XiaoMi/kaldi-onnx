@@ -4,23 +4,6 @@
 """common module."""
 from enum import Enum
 
-MaxChunkSize = 500
-DefaultChunkSize = 20
-DefaultBatch = 1
-
-NNet2 = 2
-NNet3 = 3
-
-
-TransModelHeader = '<TransitionModel>'
-TransModelEnd = '</TransitionModel>'
-
-Nnet3Header = '<Nnet3>'
-Nnet3End = '</Nnet3>'
-
-INPUT_NAME = 'input'
-IVECTOR_NAME = 'ivector'
-
 KaldiOps = [
     'Affine',
     'Append',
@@ -63,19 +46,17 @@ KaldiOpRawType = {
     "input-node": 'Input',
 }
 
-NNet3Descriptors = [
+Descriptors = [
     'Append',
     'Scale',
     'Offset',
     'Sum',
     'ReplaceIndex',
 ]
-NNet3Descriptor = Enum('NNet3Descriptors',
-                       [(op, op) for op in NNet3Descriptors],
-                       type=str)
+Descriptor = Enum('Descriptors', [(op, op) for op in Descriptors], type=str)
 
 
-NNet3Components = [
+Components = [
     'AffineComponent',
     'BatchNormComponent',
     'FixedAffineComponent',
@@ -89,9 +70,7 @@ NNet3Components = [
     'RectifiedLinearComponent',
     'TdnnComponent',
 ]
-NNet3Component = Enum('NNet3Component',
-                      [(op, op) for op in NNet3Components],
-                      type=str)
+Component = Enum('Component', [(op, op) for op in Components], type=str)
 
 
 ATTRIBUTE_NAMES = {

@@ -84,40 +84,40 @@ class Nnet3Parser:
     }
 
     self._component_parsers = {
-        NNet3Component.AffineComponent.name: self._affine_actions,
-        NNet3Component.BatchNormComponent.name: self._bachnorm_actions,
-        NNet3Component.BlockAffineComponent.name: self._affine_actions,
-        NNet3Component.BlockAffineComponentPreconditioned.name:
+        Component.AffineComponent.name: self._affine_actions,
+        Component.BatchNormComponent.name: self._bachnorm_actions,
+        Component.BlockAffineComponent.name: self._affine_actions,
+        Component.BlockAffineComponentPreconditioned.name:
             self._affine_actions,
-        NNet3Component.ClipGradientComponent.name: self._basic_actions,
-        NNet3Component.DistributeComponent.name: self._basic_actions,
-        NNet3Component.DropoutComponent.name: self._basic_actions,
-        NNet3Component.DropoutMaskComponent.name: self._basic_actions,
-        NNet3Component.ElementwiseProductComponent.name:
+        Component.ClipGradientComponent.name: self._basic_actions,
+        Component.DistributeComponent.name: self._basic_actions,
+        Component.DropoutComponent.name: self._basic_actions,
+        Component.DropoutMaskComponent.name: self._basic_actions,
+        Component.ElementwiseProductComponent.name:
             self._basic_actions,
-        NNet3Component.FixedAffineComponent.name: self._affine_actions,
-        NNet3Component.GeneralDropoutComponent.name: self._basic_actions,
-        NNet3Component.LinearComponent.name: self._linear_actions,
-        NNet3Component.LogSoftmaxComponent.name: self._nonlinear_actions,
-        NNet3Component.NaturalGradientAffineComponent.name:
+        Component.FixedAffineComponent.name: self._affine_actions,
+        Component.GeneralDropoutComponent.name: self._basic_actions,
+        Component.LinearComponent.name: self._linear_actions,
+        Component.LogSoftmaxComponent.name: self._nonlinear_actions,
+        Component.NaturalGradientAffineComponent.name:
             self._affine_actions,
-        NNet3Component.NaturalGradientRepeatedAffineComponent.name:
+        Component.NaturalGradientRepeatedAffineComponent.name:
             self._affine_actions,
-        NNet3Component.NonlinearComponent.name: self._nonlinear_actions,
-        NNet3Component.NoOpComponent.name: self._basic_actions,
-        NNet3Component.PermuteComponent.name: self._permute_actions,
-        NNet3Component.PnormComponent.name: self._basic_actions,
-        NNet3Component.RandomComponent.name: self._basic_actions,
-        NNet3Component.RectifiedLinearComponent.name:
+        Component.NonlinearComponent.name: self._nonlinear_actions,
+        Component.NoOpComponent.name: self._basic_actions,
+        Component.PermuteComponent.name: self._permute_actions,
+        Component.PnormComponent.name: self._basic_actions,
+        Component.RandomComponent.name: self._basic_actions,
+        Component.RectifiedLinearComponent.name:
             self._nonlinear_actions,
-        NNet3Component.RepeatedAffineComponent.name:
+        Component.RepeatedAffineComponent.name:
             self._affine_actions,
-        NNet3Component.SigmoidComponent.name:
+        Component.SigmoidComponent.name:
             self._nonlinear_actions,
-        NNet3Component.SoftmaxComponent.name:
+        Component.SoftmaxComponent.name:
             self._nonlinear_actions,
-        NNet3Component.TanhComponent.name: self._nonlinear_actions,
-        NNet3Component.TdnnComponent.name: self._tdnn_actions,
+        Component.TanhComponent.name: self._nonlinear_actions,
+        Component.TdnnComponent.name: self._tdnn_actions,
     }
 
     # self._configs = []
@@ -158,7 +158,7 @@ class Nnet3Parser:
       _LOG.info(component)
 
   def check_header(self, line):
-      assert line.startswith(Nnet3Header)
+      assert line.startswith('<Nnet3>')
 
   def parse_configs(self):
       while True:
@@ -231,25 +231,25 @@ class Nnet3Parser:
 
   def parse_descriptor(self, type, input_str, sub_components):
       input = input_str[len(type) + 1: -1]
-      if type == NNet3Descriptor.Offset.name:
+      if type == Descriptor.Offset.name:
           return self.parse_offset_descp(input, sub_components)
-      elif type == NNet3Descriptor.Round.name:
+      elif type == Descriptor.Round.name:
           return self.parse_round_descp(input, sub_components)
-      elif type == NNet3Descriptor.Switch.name:
+      elif type == Descriptor.Switch.name:
           return self.parse_switch_descp(input, sub_components)
-      elif type == NNet3Descriptor.Sum.name:
+      elif type == Descriptor.Sum.name:
           return self.parse_sum_descp(input, sub_components)
-      elif type == NNet3Descriptor.Failover.name:
+      elif type == Descriptor.Failover.name:
           return self.parse_failover_descp(input, sub_components)
-      elif type == NNet3Descriptor.IfDefined.name:
+      elif type == Descriptor.IfDefined.name:
           return self.parse_ifdefine_descp(input, sub_components)
-      elif type == NNet3Descriptor.Scale.name:
+      elif type == Descriptor.Scale.name:
           return self.parse_scale_descp(input, sub_components)
-      elif type == NNet3Descriptor.Const.name:
+      elif type == Descriptor.Const.name:
           return self.parse_const_descp(input, sub_components)
-      elif type == NNet3Descriptor.ReplaceIndex.name:
+      elif type == Descriptor.ReplaceIndex.name:
           return self.parse_replace_index_descp(input, sub_components)
-      elif type == NNet3Descriptor.Append.name:
+      elif type == Descriptor.Append.name:
           return self.parse_append_descp(input, sub_components)
       else:
           raise Exception(
@@ -269,12 +269,12 @@ class Nnet3Parser:
       offsets = []
       for item in items:
           type = self.check_sub_inputs(item)
-          if type in NNet3Descriptors:
+          if type in Descriptors:
               sub_comp_name = self.parse_descriptor(
                   type, item, sub_components)
               sub_comp = sub_components[-1]
               append_inputs.append(sub_comp_name)
-              if type == NNet3Descriptor.Offset.name:
+              if type == Descriptor.Offset.name:
                   offset_components.append(sub_comp)
                   offset_in = sub_comp['input']
                   offsets.append(sub_comp['offset'])
@@ -602,7 +602,7 @@ class Nnet3Parser:
                              .format(sys.argv[0],
                                      component_name,
                                      component_pos))
-          elif tok == Nnet3End:
+          elif tok == '</Nnet3>':
               _LOG.info("finished parsing nnet3 (%s) components." % num)
               assert num == self._num_components
               break
