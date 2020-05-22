@@ -23,17 +23,17 @@ class ConverterTest(unittest.TestCase):
 
   def setUp(self):
     """Share variables."""
-    self.__data_dir = Path(__file__).parent / "data"
+    self.__data_dir = Path(__file__).parent / 'data'
 
   def test_model1(self):
     """Test model in kaldi/egs/swbd/s5c/local/chain/tuning/run_tdnn_7p.sh"""
-    max_err = _test_one_model(self.__data_dir / "model1", 32, 32)
-    self.assertLess(max_err, 1e-5, "tdnn网络输出值误差不在可接受范围内.")
+    max_err = _test_one_model(self.__data_dir / 'model1', 32, 32)
+    self.assertLess(max_err, 1e-5, 'model1 inference error.')
 
   def test_model2(self):
     """Test model in kaldi/egs/swbd/s5c/local/chain/tuning/run_tdnn_7q.sh"""
-    max_err = _test_one_model(self.__data_dir / "model2", 34, 34)
-    self.assertLess(max_err, 1e-5, "tdnn网络输出值误差不在可接受范围内.")
+    max_err = _test_one_model(self.__data_dir / 'model2', 34, 34)
+    self.assertLess(max_err, 1e-5, 'model2 inference error.')
 
 
 def _test_one_model(model_dir, left_context, right_context):
@@ -48,8 +48,8 @@ def _test_one_model(model_dir, left_context, right_context):
     max err between tensorflow pb output and kaldi output.
   """
   with TemporaryDirectory() as tmp_dir:
-    kaldi_model_file = model_dir / "final.txt"
-    pb_file = Path(tmp_dir) / "tf.pb"
+    kaldi_model_file = model_dir / 'final.txt'
+    pb_file = Path(tmp_dir) / 'tf.pb'
     Converter(kaldi_model_file, left_context, right_context, pb_file).run()
 
     with tf.compat.v1.Session() as session:
@@ -59,17 +59,17 @@ def _test_one_model(model_dir, left_context, right_context):
         graph_def.ParseFromString(pb_file.read())
         tf.import_graph_def(graph_def)
 
-      feat_input = np.loadtxt(model_dir / "input.txt", dtype=np.float32)
-      feat_ivector = np.loadtxt(model_dir / "ivector.txt", dtype=np.float32)
-      feed_dict = {"input:0": feat_input, "ivector:0": feat_ivector}
-      out_tensor = session.graph.get_tensor_by_name("output.affine:0")
+      feat_input = np.loadtxt(model_dir / 'input.txt', dtype=np.float32)
+      feat_ivector = np.loadtxt(model_dir / 'ivector.txt', dtype=np.float32)
+      feed_dict = {'input:0': feat_input, 'ivector:0': feat_ivector}
+      out_tensor = session.graph.get_tensor_by_name('output.affine:0')
       output = session.run(out_tensor, feed_dict)
 
-  kaldi_output = np.loadtxt(model_dir / "output.txt", dtype=np.float32)
+  kaldi_output = np.loadtxt(model_dir / 'output.txt', dtype=np.float32)
   return np.amax(np.absolute(np.subtract(output, kaldi_output)))
 
 
 if __name__ == '__main__':
-  logging.basicConfig(format="%(asctime)s %(name)s %(levelname)s %(message)s",
+  logging.basicConfig(format='%(asctime)s %(name)s %(levelname)s %(message)s',
                       level=logging.INFO)
   unittest.main()
