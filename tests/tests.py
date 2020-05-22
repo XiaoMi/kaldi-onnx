@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 # Created by tz301 on 2020/05/22
 """Test converter."""
+import logging
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -9,6 +10,8 @@ from tempfile import TemporaryDirectory
 import numpy as np
 import tensorflow as tf
 from tensorflow.python.platform import gfile
+
+from converter.converter import Converter
 
 
 class ConverterTest(unittest.TestCase):
@@ -67,4 +70,6 @@ def _test_one_model(model_dir, left_context, right_context):
 
 
 if __name__ == '__main__':
+  logging.basicConfig(format="%(asctime)s %(name)s %(levelname)s %(message)s",
+                      level=logging.INFO)
   unittest.main()
