@@ -12,7 +12,7 @@ import six
 from converter.common import *
 from converter.graph import Graph
 from converter.node import make_node
-from converter.parser import Nnet3Parser
+from converter.parser import Parser
 from converter.utils import kaldi_check
 
 
@@ -55,9 +55,7 @@ class Converter:
   def run(self):
     """Start convert."""
     self.__parse_nnet3_file()
-    # convert components to nodes, inputs and outputs
     self.__components_to_nodes()
-    # to build graph, graph will take over the converting work
     g = Graph(self.__nodes,
               self.__inputs,
               self.__outputs,
@@ -70,15 +68,13 @@ class Converter:
               self._subsample_factor,
               self._nnet_type,
               self._fuse_lstm,
-              self._fuse_stats)
-
-    onnx_model = g.run()
+              self._fuse_stats).run()
 
   def __parse_nnet3_file(self):
     """Parse kaldi's nnet3 model file to get components."""
     logging.info(f'Start parse nnet3 model file: {self.__nnet3_file}.')
     with self.__nnet3_file.open(encoding='utf-8') as nnet3_line_buffer:
-      self.__components = Nnet3Parser(nnet3_line_buffer).run()
+      self.__components = Parser(nnet3_line_buffer).run()
 
   def __components_to_nodes(self):
     """Convert all kaldi's nnet3 components to nodes."""
