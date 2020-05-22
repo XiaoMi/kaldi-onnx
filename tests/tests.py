@@ -11,6 +11,28 @@ import tensorflow as tf
 from tensorflow.python.platform import gfile
 
 
+class ConverterTest(unittest.TestCase):
+  """Test converter.
+
+  Attributes:
+    __data_dir: data dir.
+  """
+
+  def setUp(self):
+    """Share variables."""
+    self.__data_dir = Path(__file__).parent / "data"
+
+  def test_model1(self):
+    """Test model in kaldi/egs/swbd/s5c/local/chain/tuning/run_tdnn_7p.sh"""
+    max_err = _test_one_model(self.__data_dir / "model1", 32, 32)
+    self.assertLess(max_err, 1e-5, "tdnn网络输出值误差不在可接受范围内.")
+
+  def test_model2(self):
+    """Test model in kaldi/egs/swbd/s5c/local/chain/tuning/run_tdnn_7q.sh"""
+    max_err = _test_one_model(self.__data_dir / "model2", 34, 34)
+    self.assertLess(max_err, 1e-5, "tdnn网络输出值误差不在可接受范围内.")
+
+
 def _test_one_model(model_dir, left_context, right_context):
   """Convert one model and check output.
 
