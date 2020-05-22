@@ -47,6 +47,10 @@ which is required for converting.
 python3 -m converter.convert <input_kaldi_model> <left_context> <right_context> <out_tensorflow_pb> 
 ```
 
+Notice: different from Kaldi's invariant time dimension, the output tensorflow pb model support dynamic time dimension.
+
+See [tests](tests/tests.py) for how to use pb model.
+
 ### 5. Graph review
 
 After converting, there is a graphic tool for you to review the onnx model: [ONNX Model Viewer](https://lutzroeder.github.io/netron/).
