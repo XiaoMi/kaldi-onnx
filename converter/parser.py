@@ -3,9 +3,10 @@
 # Created by tz301 on 2020/05/21
 """Parse nnet3 model."""
 import re
-from typing import Dict, List, Optional, TextIO, Tuple
+from typing import Dict, List, Optional, TextIO
 
 from converter.common import *
+from converter.component import Components
 from converter.utils import *
 
 
@@ -18,90 +19,12 @@ class Parser:
     Args:
       line_buffer: line buffer for kaldi's text mdl file.
     """
-    self.__affine_actions = {
-        '<LinearParams>': (read_matrix, 'params'),
-        '<BiasParams>': (read_vector, 'bias'),
-        '<MaxChange>': (read_float, 'max_change'),
-        '<RankIn>': (read_int, 'rank_in'),
-        '<RankOut>': (read_int, 'rank_out'),
-        '<UpdatedPeriod>': (read_int, 'updated_period'),
-        '<NumSamplesHistory>': (read_float, 'num_samples_history'),
-        '<Alpha>': (read_float, 'alpha'),
-        '<NumRepeats>': (read_int, 'num_repeats'),
-        '<NumBlocks>': (read_int, 'num_blocks'),
-    }
-
-    self.__batchnorm_actions = {
-        '<Dim>': (read_int, 'dim'),
-        '<BlockDim>': (read_int, 'block_dim'),
-        '<Epsilon>': (read_float, 'epsilon'),
-        '<TargetRms>': (read_float, 'target_rms'),
-        '<Count>': (read_float, 'count'),
-        '<StatsMean>': (read_vector, 'stats_mean'),
-        '<StatsVar>': (read_vector, 'stats_var'),
-        '<TestMode>': (read_bool, 'test_mode'),
-    }
-
-    self.__basic_actions = {
-        '<Dim>': (read_int, 'dim'),
-        '<InputDim>': (read_int, 'input_dim'),
-        '<OutputDim>': (read_int, 'output_dim')
-    }
-
-    self.__linear_actions = {
-        '<Params>': (read_matrix, 'params'),
-        '<RankInOut>': (read_int, 'rank_inout'),
-        '<UpdatedPeriod>': (read_int, 'updated_period'),
-        '<NumSamplesHistory>': (read_float, 'num_samples_history'),
-        '<Alpha>': (read_float, 'alpha')
-    }
-
-    self.__nonlinear_actions = {
-        '<Dim>': (read_int, 'dim'),
-        '<BlockDim>': (read_int, 'block_dim'),
-        '<ValueAvg>': (read_vector, 'value_avg'),
-        '<DerivAvg>': (read_vector, 'deriv_avg'),
-        '<OderivRms>': (read_vector, 'oderiv_rms'),
-        '<Count>': (read_float, 'count'),
-        '<OderivCount>': (read_float, 'oderiv_count')
-    }
-
-    self.__permute_actions = {
-        '<ColumnMap>': (read_vector, 'column_map'),
-    }
-
-    self.__tdnn_actions = {
-        '<TimeOffsets>': (read_vector_int, 'time_offsets'),
-        '<LinearParams>': (read_matrix, 'params'),
-        '<BiasParams>': (read_vector, 'bias'),
-        '<OrthonormalConstraint>': (read_float, 'orthonormal_constraint'),
-        '<UseNaturalGradient>': (read_bool, 'use_natrual_gradient'),
-        '<RankInOut>': (read_int, 'rank_inout'),
-        '<NumSamplesHistory>': (read_float, 'num_samples_history'),
-        '<Alpha>': (read_float, 'alpha'),
-        '<AlphaInOut>': (read_float, 'alpha_inout'),
-    }
-
-    self.__component_parsers = {
-        Component.AffineComponent.name: self.__affine_actions,
-        Component.BatchNormComponent.name: self.__batchnorm_actions,
-        Component.FixedAffineComponent.name: self.__affine_actions,
-        Component.GeneralDropoutComponent.name: self.__basic_actions,
-        Component.LinearComponent.name: self.__linear_actions,
-        Component.LogSoftmaxComponent.name: self.__nonlinear_actions,
-        Component.NaturalGradientAffineComponent.name: self.__affine_actions,
-        Component.NonlinearComponent.name: self.__nonlinear_actions,
-        Component.NoOpComponent.name: self.__basic_actions,
-        Component.PermuteComponent.name: self.__permute_actions,
-        Component.RectifiedLinearComponent.name: self.__nonlinear_actions,
-        Component.TdnnComponent.name: self.__tdnn_actions,
-    }
-
     self.__name_to_component = dict()
     self.__num_components = 0
     self.__line_buffer = line_buffer
     self.__pos = 0
     self.__current_id = 0
+    self.__type_to_component = {c.value.__name__: c.value for c in Components}
 
   def run(self) -> List:
     """Start parse nnet3 model file."""
@@ -508,22 +431,14 @@ class Parser:
           tok, pos = read_next_token(line, pos)
 
       if tok == '<ComponentName>':
-        component_pos = pos
         component_name, pos = read_next_token(line, pos)
-
         component_type, pos = read_component_type(line, pos)
-        assert is_component_type(component_type)
-        component_dict, line, pos = self.read_component(line, pos,
-                                                        component_type)
-        if component_dict is not None:
-          if component_name in self.__name_to_component:
-            config_dict = self.__name_to_component[component_name]
-            new_dict = merge_two_dicts(config_dict, component_dict)
-            self.__name_to_component[component_name] = new_dict
-            num += 1
-        else:
-          raise ValueError(f"Error reading component with name {component_name}"
-                           f" at position {component_pos}.")
+        component = self.__read_component(line, pos, component_type)
+
+        if component_name in self.__name_to_component:
+          component.update_params(self.__name_to_component[component_name])
+          self.__name_to_component[component_name] = component
+          num += 1
       elif tok == '</Nnet3>':
         assert num == self.__num_components
         logging.info(f"Finished parsing nnet3 {num} components.")
@@ -532,7 +447,7 @@ class Parser:
         raise ValueError(f"Error reading component at position {pos}, "
                          f"expected <ComponentName>, got: {tok}.")
 
-  def read_component(self, line, pos, component_type) -> Tuple[Dict, str, int]:
+  def __read_component(self, line, pos, component_type) -> Component:
     """Read component.
 
     Args:
@@ -541,20 +456,15 @@ class Parser:
       component_type: type of component.
 
     Returns:
-      Component, line and position after reading component.
+      Component.
     """
     terminating_token = "</" + component_type[1:]
     terminating_tokens = {terminating_token, '<ComponentName>'}
 
     component_type = component_type[1:-1]
-    if component_type in self.__component_parsers:
-      action_dict = self.__component_parsers[component_type]
-      component, pos = read_generic(line, pos, self.__line_buffer,
-                                    terminating_tokens, action_dict)
-
-      if component is not None:
-        component['type'] = KaldiOpRawType[component_type]
-        component['raw-type'] = component_type[1:-10]
-      return component, line, pos
+    if component_type in self.__type_to_component:
+      component = self.__type_to_component[component_type]
+      component.read_params(self.__line_buffer, line, pos, terminating_tokens)
+      return component
     else:
       raise NotImplementedError(f"Component: {component_type} not supported.")
