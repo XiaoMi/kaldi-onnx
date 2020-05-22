@@ -33,7 +33,7 @@ This tool only supports Kaldi's text model as an input.
 If you have a binary model, Kaldi's `nnet3-copy` tool can help you get a text one:
 
 ```sh
-kaldi/src/nnet3bin/nnet3-copy --binary=false --prepare-for-test=true final.mdl text.mdl
+kaldi/src/nnet3bin/nnet3-copy --binary=false --prepare-for-test=true final.mdl final.txt
 ```
 
 Don't forget to use the `--prepare-for-test=true` option.
@@ -44,7 +44,7 @@ which is required for converting.
 ### 4. Convert
 
 ```sh
-python3 -m converter.convert <input_kaldi_model> <left_context> <right_context> <out_tensorflow_pb> 
+python3 -m converter.convert <input_kaldi_nnet3_file> <left_context> <right_context> <out_tensorflow_pb> 
 ```
 
 Notice: different from Kaldi's invariant time dimension, the output tensorflow pb model support dynamic time dimension.
