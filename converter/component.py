@@ -32,12 +32,12 @@ class Component(metaclass=ABCMeta):
   """Kaldi nnet3 component.
 
   Attributes:
-    _params: params dict.
+    __params: params dict.
   """
 
   def __init__(self):
     """Initialize."""
-    self._params = dict()
+    self.__params = dict()
 
   @staticmethod
   def _actions():
@@ -63,8 +63,8 @@ class Component(metaclass=ABCMeta):
       pos: start position.
       terminating_tokens: set of terminating tokens.
     """
-    self._params['type'] = KaldiOpRawType[self.__class__.__name__]
-    self._params['raw-type'] = self.__class__.__name__[1:-10]
+    self.__params['type'] = KaldiOpRawType[self.__class__.__name__]
+    self.__params['raw-type'] = self.__class__.__name__[1:-10]
     actions = self._actions()
 
     while True:
@@ -83,7 +83,15 @@ class Component(metaclass=ABCMeta):
       if token in actions:
         func, name = actions[token]
         obj, pos = func(line, pos, line_buffer)
-        self._params[name] = obj
+        self.__params[name] = obj
+
+  def update_params(self, params_dict):
+    """Update params.
+
+    Args:
+      params_dict: params dict.
+    """
+    self.__params.update(params_dict)
 
 
 class GeneralDropoutComponent(Component):
