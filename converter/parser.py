@@ -1,20 +1,18 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# Created by tz301
+# Created by tz301 on 2020/05/21
 """Parse nnet3 model."""
 import re
 
 from converter.common import *
 from converter.utils import *
 
-_LOG = logging.getLogger(__name__)
-
 
 class Nnet3Parser:
   """Kaldi nnet3 model parser."""
 
   def __init__(self, line_buffer):
-    """initialize..
+    """Initialize.
 
     Args:
       line_buffer: line buffer for kaldi's text mdl file.
@@ -131,68 +129,57 @@ class Nnet3Parser:
     self._transition_model = []
 
   def run(self):
-      line = self.parse_transition_model()
-      self.check_header(line)
-      self.parse_configs()
-      self.parse_component_lines()
-      self._components = []
-      for component_name in self._components_by_name:
-          self._components.append(
-              self._components_by_name[component_name])
-      return self._components, self._transition_model
+    """Start parse."""
+    self.check_header()
+    self.__parse_nnet3_configs()
+    self.parse_component_lines()
+    self._components = []
+    for component_name in self._components_by_name:
+      self._components.append(
+          self._components_by_name[component_name])
+    return self._components, self._transition_model
 
-  def parse_transition_model(self):
-      line = next(self._line_buffer)
-      if line.startswith("<TransitionModel>"):
-          self._transition_model.append(line)
-          while True:
-              line = next(self._line_buffer)
-              self._transition_model.append(line)
-              if line.startswith("</TransitionModel>"):
-                  line = next(self._line_buffer)
-                  break
-      return line
+  def check_header(self):
+    """Check nnet3 file header."""
+    line = next(self._line_buffer)
+    if not line.startswith('<Nnet3>'):
+      raise ValueError('Parse error: <Nnet3> header not found.')
 
-  def print_components_info(self):
-    for component in self._components:
-      _LOG.info(component)
+  def __parse_nnet3_configs(self):
+    """Parse all nnet3 config."""
+    while True:
+      line = next(self._line_buffer, 'Parser_EOF')
+      if line == 'Parser_EOF':
+        raise Exception('No <NumComponents> in File.')
+      if line.startswith('<NumComponents>'):
+        self._num_components = int(line.split()[1])
+        break
 
-  def check_header(self, line):
-      assert line.startswith('<Nnet3>')
+      config_type, parsed_config = self.__parse_nnet3_config(line)
+      if config_type is not None:
+          parsed_config['node_type'] = config_type
 
-  def parse_configs(self):
-      while True:
-          line = next(self._line_buffer, 'Parser_EOF')
-          if line == 'Parser_EOF':
-              raise Exception('No <NumComponents> in File.')
-          if line.startswith("<NumComponents>"):
-              self._num_components = int(line.split()[1])
-              break
-          config_type, parsed_config = self.parse_nnet3_config(line)
-          if config_type is not None:
-              parsed_config['node_type'] = config_type
+          if 'input' in parsed_config:
+              input = parsed_config['input']
+              parsed_input = self.parse_input_descriptor(input)
+              if isinstance(parsed_input, list):
+                  parsed_config['input'] = parsed_input
+              else:
+                  parsed_config['input'] = [parsed_input]
 
-              if 'input' in parsed_config:
-                  input = parsed_config['input']
-                  parsed_input = self.parse_input_descriptor(input)
-                  if isinstance(parsed_input, list):
-                      parsed_config['input'] = parsed_input
-                  else:
-                      parsed_config['input'] = [parsed_input]
-
-              if config_type in ['output-node',
-                                 'input-node',
-                                 'dim-range-node']:
-                  parsed_config['type'] = KaldiOpRawType[config_type]
-                  kaldi_check('name' in parsed_config,
-                              "Expect 'name' value in %s" % parsed_config)
-                  if 'input-node' in parsed_config:
-                      parsed_config['input'] = [parsed_config['input-node']]
-                  if 'dim-offset' in parsed_config:
-                      parsed_config['offset'] = parsed_config['dim-offset']
-              self._current_id += 1
-              parsed_config['id'] = self._current_id
-              self.add_component(parsed_config)
+          if config_type in ['output-node',
+                             'input-node',
+                             'dim-range-node']:
+              parsed_config['type'] = KaldiOpRawType[config_type]
+              kaldi_check('name' in parsed_config,
+                          "Expect 'name' value in %s" % parsed_config)
+              if 'input-node' in parsed_config:
+                  parsed_config['input'] = [parsed_config['input-node']]
+              if 'dim-offset' in parsed_config:
+                  parsed_config['offset'] = parsed_config['dim-offset']
+          self._current_id += 1
+          parsed_config['id'] = self._current_id
+          self.add_component(parsed_config)
 
   def add_component(self, component):
       kaldi_check('name' in component or 'component' in component,
@@ -233,16 +220,8 @@ class Nnet3Parser:
       input = input_str[len(type) + 1: -1]
       if type == Descriptor.Offset.name:
           return self.parse_offset_descp(input, sub_components)
-      elif type == Descriptor.Round.name:
-          return self.parse_round_descp(input, sub_components)
-      elif type == Descriptor.Switch.name:
-          return self.parse_switch_descp(input, sub_components)
       elif type == Descriptor.Sum.name:
           return self.parse_sum_descp(input, sub_components)
-      elif type == Descriptor.Failover.name:
-          return self.parse_failover_descp(input, sub_components)
-      elif type == Descriptor.IfDefined.name:
-          return self.parse_ifdefine_descp(input, sub_components)
       elif type == Descriptor.Scale.name:
           return self.parse_scale_descp(input, sub_components)
       elif type == Descriptor.Const.name:
@@ -397,57 +376,6 @@ class Nnet3Parser:
       sub_components.append(component)
       return comp_name
 
-  def parse_round_descp(self, input, sub_components):
-      items = parenthesis_split(input, ",")
-      kaldi_check(len(items) == 2, 'Round descriptor should have 2 items.')
-      sub_type = self.check_sub_inputs(items[0])
-      if sub_type is not None:
-          input_name = self.parse_descriptor(sub_type,
-                                             items[0],
-                                             sub_components)
-      else:
-          input_name = items[0]
-      modulus = int(items[1])
-      comp_name = input_name + '.Round.' + str(modulus)
-      self._current_id += 1
-      component = {
-          'id': self._current_id,
-          'type': 'Round',
-          'name': comp_name,
-          'input': [input_name],
-          'modulus': modulus
-      }
-      sub_components.append(component)
-      return comp_name
-
-  def parse_switch_descp(self, input, sub_components):
-      items = parenthesis_split(input, ",")
-      kaldi_check(len(items) >= 2, 'Switch descriptor should have 2 items.')
-      sub_type = self.check_sub_inputs(items[0])
-      if sub_type is not None:
-          input_name = self.parse_descriptor(sub_type,
-                                             items[0],
-                                             sub_components)
-      else:
-          input_name = items[0]
-      sub_type = self.check_sub_inputs(items[1])
-      if sub_type is not None:
-          other_name = self.parse_descriptor(sub_type,
-                                             items[1],
-                                             sub_components)
-      else:
-          other_name = items[1]
-      comp_name = input_name + '.Switch.' + other_name
-      self._current_id += 1
-      component = {
-          'id': self._current_id,
-          'type': 'Switch',
-          'name': comp_name,
-          'input': items,
-      }
-      sub_components.append(component)
-      return comp_name, component
-
   def parse_sum_descp(self, input, sub_components):
       items = parenthesis_split(input, ",")
       kaldi_check(len(items) == 2, 'Sum descriptor should have 2 items.')
@@ -471,35 +399,6 @@ class Nnet3Parser:
       component = {
           'id': self._current_id,
           'type': 'Sum',
-          'name': comp_name,
-          'input': [input_name, other_name],
-      }
-      sub_components.append(component)
-      return comp_name
-
-  def parse_failover_descp(self, input, sub_components):
-      items = parenthesis_split(input, ",")
-      kaldi_check(len(items) == 2,
-                  'Failover descriptor should have 2 items.')
-      sub_type = self.check_sub_inputs(items[0])
-      if sub_type is not None:
-          input_name = self.parse_descriptor(sub_type,
-                                             items[0],
-                                             sub_components)
-      else:
-          input_name = items[0]
-      sub_type = self.check_sub_inputs(items[1])
-      if sub_type is not None:
-          other_name = self.parse_descriptor(sub_type,
-                                             items[1],
-                                             sub_components)
-      else:
-          other_name = items[1]
-      comp_name = input_name + '.Failover.' + other_name
-      self._current_id += 1
-      component = {
-          'id': self._current_id,
-          'type': 'Failover',
           'name': comp_name,
           'input': [input_name, other_name],
       }
@@ -532,40 +431,6 @@ class Nnet3Parser:
       sub_components.append(component)
       return comp_name
 
-  def parse_ifdefine_descp(self, input, sub_components):
-      if input.startswith('Offset('):
-          sub_input = input[7:-1]
-          items = sub_input.split(",")
-          kaldi_check(len(items) == 2,
-                      'IfDefined descriptor should have 2 items.')
-          sub_type = self.check_sub_inputs(items[0])
-          if sub_type is not None:
-              input_name = self.parse_descriptor(sub_type,
-                                                 items[0],
-                                                 sub_components)
-          else:
-              # input_name = items[0]
-              if items[0] in self._component_names:
-                  input_name = items[0]
-              else:
-                  input_name = items[0] + '.IfDefined'
-          offset = int(items[1])
-      else:
-          input_name = input
-          offset = 0
-      comp_name = input_name + '.' + str(offset)
-      # input_name = input_name + ".IfDefined"
-      self._current_id += 1
-      component = {
-          'id': self._current_id,
-          'type': 'IfDefined',
-          'name': comp_name,
-          'input': [input_name],
-          'offset': offset,
-      }
-      sub_components.append(component)
-      return comp_name
-
   def parse_component_lines(self):
       """Parse all components lines before </Nnet3>"""
       num = 0
@@ -577,7 +442,7 @@ class Nnet3Parser:
               line = next(self._line_buffer)
               pos = 0
               if line is None:
-                  _LOG.error("unexpected EOF on line:\n {}".format(line))
+                  logging.error("unexpected EOF on line:\n {}".format(line))
                   break
               else:
                   tok, pos = read_next_token(line, pos)
@@ -597,17 +462,17 @@ class Nnet3Parser:
                       self._components_by_name[component_name] = new_dict
                       num += 1
               else:
-                  _LOG.error("{0}: error reading component with name {1}"
+                  logging.error("{0}: error reading component with name {1}"
                              " at position {2}"
                              .format(sys.argv[0],
                                      component_name,
                                      component_pos))
           elif tok == '</Nnet3>':
-              _LOG.info("finished parsing nnet3 (%s) components." % num)
+              logging.info("finished parsing nnet3 (%s) components." % num)
               assert num == self._num_components
               break
           else:
-              _LOG.error("{0}: error reading Component:"
+              logging.error("{0}: error reading Component:"
                          " at position {1}, expected <ComponentName>,"
                          " got: {2}"
                          .format(sys.argv[0], pos, tok))
@@ -630,7 +495,7 @@ class Nnet3Parser:
               d['raw-type'] = component_type[1:-10]  # e.g. 'Linear'
           return d, line, pos
       else:
-          _LOG.info("Component: %s not supported yet." % type)
+          logging.info("Component: %s not supported yet." % type)
           return None, line, pos
 
   @staticmethod
@@ -652,7 +517,7 @@ class Nnet3Parser:
           if tok is None:
               line = next(line_buffer)
               if line is None:
-                  _LOG.error(
+                  logging.error(
                       "{0}: error reading object starting at position {1},"
                       " got EOF while expecting one of: {2}".format(
                           sys.argv[0], orig_pos, terminating_tokens))
@@ -667,12 +532,19 @@ class Nnet3Parser:
       return d, pos
 
   @staticmethod
-  def parse_nnet3_config(line):
-    if re.search(
-      '^input-node|^component|^output-node|^component-node|'
-      '^dim-range-node',
-          line.strip()) is None:
+  def __parse_nnet3_config(line):
+    """Parse config from one line content of nnet3 file.
+
+    Args:
+      line: one line content of nnet3 file.
+
+    Returns:
+      type and content.
+    """
+    if re.search('^input-node|^component|^output-node|^component-node|'
+                 '^dim-range-node', line.strip()) is None:
       return [None, None]
+
     parts = line.split()
     config_type = parts[0]
     fields = []
