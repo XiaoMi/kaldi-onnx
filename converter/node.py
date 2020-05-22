@@ -20,10 +20,9 @@ from __future__ import division
 from __future__ import print_function
 
 import six
-import logging
 
-from common import *
-from utils import *
+from converter.common import *
+from converter.utils import *
 
 _LOG = logging.getLogger(__name__)
 

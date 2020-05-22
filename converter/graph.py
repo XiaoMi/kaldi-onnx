@@ -19,12 +19,9 @@ converter.graph - class to manage graph manipulation on top of ONNX
 from __future__ import division
 from __future__ import print_function
 
-import logging
-import six
-import numpy as np
+from onnx import checker, defs, helper, numpy_helper, onnx_pb
 
-from onnx import defs, helper, checker, numpy_helper, onnx_pb
-from node import *
+from converter.node import *
 
 _LOG = logging.getLogger(__name__)
 
