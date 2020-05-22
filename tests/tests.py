@@ -45,12 +45,12 @@ def _test_one_model(model_dir, left_context, right_context):
     max err between tensorflow pb output and kaldi output.
   """
   with TemporaryDirectory() as tmp_dir:
-    kaldi_model_path = model_dir / "final.txt"
-    pb_path = Path(tmp_dir) / "tf.pb"
-    Converter(kaldi_model_path, left_context, right_context, pb_path).run()
+    kaldi_model_file = model_dir / "final.txt"
+    pb_file = Path(tmp_dir) / "tf.pb"
+    Converter(kaldi_model_file, left_context, right_context, pb_file).run()
 
     with tf.compat.v1.Session() as session:
-      with gfile.FastGFile(pb_path, 'rb') as pb_file:
+      with gfile.FastGFile(pb_file, 'rb') as pb_file:
         tf.compat.v1.reset_default_graph()
         graph_def = tf.compat.v1.GraphDef()
         graph_def.ParseFromString(pb_file.read())
