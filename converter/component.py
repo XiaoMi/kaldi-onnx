@@ -3,9 +3,29 @@
 # Created by tz301 on 2020/05/22
 """Nnet3 component."""
 from abc import ABCMeta
+from enum import Enum, unique
 from typing import Set, TextIO
 
+from converter.common import KaldiOpRawType
 from converter.utils import *
+
+
+@unique
+class Components(Enum):
+  """Kaldi nnet3 Components."""
+
+  AffineComponent: AffineComponent
+  BatchNormComponent: BatchNormComponent
+  FixedAffineComponent: FixedAffineComponent
+  GeneralDropoutComponent: GeneralDropoutComponent
+  LinearComponent: LinearComponent
+  LogSoftmaxComponent: LogSoftmaxComponent
+  NaturalGradientAffineComponent: NaturalGradientAffineComponent
+  NonlinearComponent: NonlinearComponent
+  NoOpComponent: NoOpComponent
+  PermuteComponent: PermuteComponent
+  RectifiedLinearComponent: RectifiedLinearComponent
+  TdnnComponent: TdnnComponent
 
 
 class Component(metaclass=ABCMeta):
@@ -43,6 +63,8 @@ class Component(metaclass=ABCMeta):
       pos: start position.
       terminating_tokens: set of terminating tokens.
     """
+    self._params['type'] = KaldiOpRawType[self.__class__.__name__]
+    self._params['raw-type'] = self.__class__.__name__[1:-10]
     actions = self._actions()
 
     while True:
