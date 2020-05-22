@@ -76,7 +76,7 @@ class AffineComponent(Component):
   """AffineComponent."""
 
   def _actions(self):
-    """See baseclass doc."""
+    """See baseclass document."""
     actions = {
         '<LinearParams>': (read_matrix, 'params'),
         '<BiasParams>': (read_vector, 'bias'),
@@ -104,7 +104,7 @@ class BatchNormComponent(Component):
   """BatchNormComponent."""
 
   def _actions(self):
-    """See baseclass doc."""
+    """See baseclass document."""
     actions = {
         '<Dim>': (read_int, 'dim'),
         '<BlockDim>': (read_int, 'block_dim'),
@@ -122,7 +122,7 @@ class LinearComponent(Component):
   """LinearComponent."""
 
   def _actions(self):
-    """See baseclass doc."""
+    """See baseclass document."""
     actions = {
         '<Params>': (read_matrix, 'params'),
         '<RankInOut>': (read_int, 'rank_inout'),
@@ -137,7 +137,7 @@ class NonlinearComponent(Component):
   """NonlinearComponent."""
 
   def _actions(self):
-    """See baseclass doc."""
+    """See baseclass document."""
     actions = {
         '<Dim>': (read_int, 'dim'),
         '<BlockDim>': (read_int, 'block_dim'),
@@ -162,7 +162,7 @@ class PermuteComponent(Component):
   """PermuteComponent."""
 
   def _actions(self):
-    """See baseclass doc."""
+    """See baseclass document."""
     return {'<ColumnMap>': (read_vector, 'column_map')}
 
 
@@ -170,7 +170,7 @@ class TdnnComponent(Component):
   """TdnnComponent."""
 
   def _actions(self):
-    """See baseclass doc."""
+    """See baseclass document."""
     actions = {
         '<TimeOffsets>': (read_vector_int, 'time_offsets'),
         '<LinearParams>': (read_matrix, 'params'),
