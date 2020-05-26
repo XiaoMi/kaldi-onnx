@@ -201,15 +201,15 @@ class TdnnComponent(Component):
 class Components(Enum):
   """Kaldi nnet3 Components."""
 
-  AffineComponent: AffineComponent
-  BatchNormComponent: BatchNormComponent
-  FixedAffineComponent: FixedAffineComponent
-  GeneralDropoutComponent: GeneralDropoutComponent
-  LinearComponent: LinearComponent
-  LogSoftmaxComponent: LogSoftmaxComponent
-  NaturalGradientAffineComponent: NaturalGradientAffineComponent
-  NonlinearComponent: NonlinearComponent
-  NoOpComponent: NoOpComponent
-  PermuteComponent: PermuteComponent
-  RectifiedLinearComponent: RectifiedLinearComponent
-  TdnnComponent: TdnnComponent
+  AffineComponent = AffineComponent
+  BatchNormComponent = BatchNormComponent
+  FixedAffineComponent = FixedAffineComponent
+  GeneralDropoutComponent = GeneralDropoutComponent
+  LinearComponent = LinearComponent
+  LogSoftmaxComponent = LogSoftmaxComponent
+  NaturalGradientAffineComponent = NaturalGradientAffineComponent
+  NonlinearComponent = NonlinearComponent
+  NoOpComponent = NoOpComponent
+  PermuteComponent = PermuteComponent
+  RectifiedLinearComponent = RectifiedLinearComponent
+  TdnnComponent = TdnnComponent
