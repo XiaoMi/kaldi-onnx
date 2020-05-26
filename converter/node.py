@@ -19,6 +19,8 @@ converter.node - class to manage Node
 from __future__ import division
 from __future__ import print_function
 
+import logging
+
 import six
 
 from converter.common import *

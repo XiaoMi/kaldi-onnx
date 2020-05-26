@@ -203,8 +203,7 @@ class Parser:
     return False
 
   @staticmethod
-  def __splice_continuous_numbers(nums: List[int]) -> Optional[List[int],
-                                                               List[List[int]]]:
+  def __splice_continuous_numbers(nums: List[int]) -> List:
     """Get splice continuous numbers.
 
     Args:
@@ -241,7 +240,7 @@ class Parser:
     Returns:
       List of split elements.
     """
-    separator = '='
+    separator = ','
     sentence = sentence.strip(separator)
 
     ln = [0]
