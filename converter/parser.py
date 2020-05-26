@@ -2,12 +2,14 @@
 # -*- coding: utf-8 -*-
 # Created by tz301 on 2020/05/21
 """Parse nnet3 model."""
+import logging
 import re
 from typing import Dict, List, Optional, TextIO
 
 from converter.common import *
-from converter.component import Component, Components
-from converter.utils import *
+from converter.component import (Component, Components, read_component_type,
+                                 read_next_token)
+from converter.utils import kaldi_check
 
 
 class Parser:
@@ -200,6 +202,67 @@ class Parser:
         return True
     return False
 
+  @staticmethod
+  def __splice_continuous_numbers(nums: List[int]) -> Optional[List[int],
+                                                               List[List[int]]]:
+    """Get splice continuous numbers.
+
+    Args:
+      nums: input numbers.
+
+    Returns:
+      continuous numbers.
+    """
+    if len(nums) == 1:
+      return nums
+
+    new_nums = list()
+    first = nums[0]
+    pre = nums[0]
+    new_nums.append([first])
+    index = 0
+    for i in range(1, len(nums)):
+      if nums[i] - pre == 1:
+        new_nums[index].append(nums[i])
+        pre = nums[i]
+      else:
+        index += 1
+        new_nums.append([nums[i]])
+        pre = nums[i]
+    return new_nums
+
+  @staticmethod
+  def __parenthesis_split(sentence: str) -> List[str]:
+    """Split sentence by parenthesis.
+
+    Args:
+      sentence: sentence string.
+
+    Returns:
+      List of split elements.
+    """
+    separator = '='
+    sentence = sentence.strip(separator)
+
+    ln = [0]
+    nb_brackets = 0
+    for i, c in enumerate(sentence):
+      if c == "(":
+        nb_brackets += 1
+      elif c == ")":
+        nb_brackets -= 1
+      elif c == separator and nb_brackets == 0:
+        ln.append(i)
+
+      if nb_brackets < 0:
+        raise ValueError(f"Syntax error: {sentence}.")
+
+    ln.append(len(sentence))
+    if nb_brackets > 0:
+      raise Exception("Syntax error")
+
+    return [sentence[i:j].strip(separator) for i, j in zip(ln, ln[1:])]
+
   def __parse_append_descriptor(self, input_str: str,
                                 components: List[Optional[Dict]]) -> str:
     """Parse kaldi Append descriptor.
@@ -211,7 +274,7 @@ class Parser:
     Returns:
       Component name.
     """
-    items = parenthesis_split(input_str, ",")
+    items = self.__parenthesis_split(input_str)
     num_inputs = len(items)
     kaldi_check(num_inputs >= 2, "Append should have at least two inputs.")
 
@@ -257,7 +320,7 @@ class Parser:
         components.remove(item)
       components.append(component)
     else:
-      splice_indexes = splice_continous_numbers(offset_indexes)
+      splice_indexes = self.__splice_continuous_numbers(offset_indexes)
       if (len(pure_inputs) == 1 and len(splice_indexes) == 1 and
           len(offset_inputs) > 1):
         self.__current_id += 1
@@ -307,7 +370,7 @@ class Parser:
     Returns:
       Component name.
     """
-    items = parenthesis_split(input_str, ",")
+    items = self.__parenthesis_split(input_str)
     kaldi_check(len(items) == 2, 'Offset descriptor should have 2 items.')
 
     sub_type = self.__parse_sub_type(items[0])
@@ -340,7 +403,7 @@ class Parser:
     Returns:
       Component name.
     """
-    items = parenthesis_split(input_str, ",")
+    items = self.__parenthesis_split(input_str)
     kaldi_check(len(items) == 3, 'ReplaceIndex descriptor should have 3 items.')
 
     sub_type = self.__parse_sub_type(items[0])
@@ -372,7 +435,7 @@ class Parser:
     Returns:
       Component name.
     """
-    items = parenthesis_split(input_str, ",")
+    items = self.__parenthesis_split(input_str)
     kaldi_check(len(items) == 2, 'Scale descriptor should have 2 items.')
 
     scale = float(items[0])
@@ -405,7 +468,7 @@ class Parser:
     Returns:
       component name.
     """
-    items = parenthesis_split(input_str, ",")
+    items = self.__parenthesis_split(input_str)
     kaldi_check(len(items) == 2, 'Sum descriptor should have 2 items.')
 
     input_names = list()
