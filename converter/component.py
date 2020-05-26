@@ -4,10 +4,11 @@
 """Nnet3 component."""
 from abc import ABCMeta
 from enum import Enum, unique
-from typing import Set, TextIO
+from typing import Dict, Optional, Set, TextIO, Tuple
+
+import numpy as np
 
 from converter.common import KaldiOpRawType
-from converter.utils import *
 
 
 class Component(metaclass=ABCMeta):
@@ -22,16 +23,16 @@ class Component(metaclass=ABCMeta):
     self.__params = dict()
 
   @staticmethod
-  def _actions():
+  def _actions() -> Dict:
     """Get actions for read different params.
 
     Returns:
       actions dict.
     """
     actions = {
-        '<Dim>': (read_int, 'dim'),
-        '<InputDim>': (read_int, 'input_dim'),
-        '<OutputDim>': (read_int, 'output_dim')
+        '<Dim>': (_read_int, 'dim'),
+        '<InputDim>': (_read_int, 'input_dim'),
+        '<OutputDim>': (_read_int, 'output_dim')
     }
     return actions
 
@@ -67,7 +68,7 @@ class Component(metaclass=ABCMeta):
         obj, pos = func(line, pos, line_buffer)
         self.__params[name] = obj
 
-  def update_params(self, params_dict):
+  def update_params(self, params_dict: Dict):
     """Update params.
 
     Args:
@@ -87,19 +88,19 @@ class NoOpComponent(Component):
 class AffineComponent(Component):
   """AffineComponent."""
 
-  def _actions(self):
+  def _actions(self) -> Dict:
     """See baseclass document."""
     actions = {
-        '<LinearParams>': (read_matrix, 'params'),
-        '<BiasParams>': (read_vector, 'bias'),
-        '<MaxChange>': (read_float, 'max_change'),
-        '<RankIn>': (read_int, 'rank_in'),
-        '<RankOut>': (read_int, 'rank_out'),
-        '<UpdatedPeriod>': (read_int, 'updated_period'),
-        '<NumSamplesHistory>': (read_float, 'num_samples_history'),
-        '<Alpha>': (read_float, 'alpha'),
-        '<NumRepeats>': (read_int, 'num_repeats'),
-        '<NumBlocks>': (read_int, 'num_blocks'),
+        '<LinearParams>': (_read_matrix_trans, 'params'),
+        '<BiasParams>': (_read_vector_float, 'bias'),
+        '<MaxChange>': (_read_float, 'max_change'),
+        '<RankIn>': (_read_int, 'rank_in'),
+        '<RankOut>': (_read_int, 'rank_out'),
+        '<UpdatedPeriod>': (_read_int, 'updated_period'),
+        '<NumSamplesHistory>': (_read_float, 'num_samples_history'),
+        '<Alpha>': (_read_float, 'alpha'),
+        '<NumRepeats>': (_read_int, 'num_repeats'),
+        '<NumBlocks>': (_read_int, 'num_blocks'),
     }
     return actions
 
@@ -115,17 +116,17 @@ class NaturalGradientAffineComponent(AffineComponent):
 class BatchNormComponent(Component):
   """BatchNormComponent."""
 
-  def _actions(self):
+  def _actions(self) -> Dict:
     """See baseclass document."""
     actions = {
-        '<Dim>': (read_int, 'dim'),
-        '<BlockDim>': (read_int, 'block_dim'),
-        '<Epsilon>': (read_float, 'epsilon'),
-        '<TargetRms>': (read_float, 'target_rms'),
-        '<Count>': (read_float, 'count'),
-        '<StatsMean>': (read_vector, 'stats_mean'),
-        '<StatsVar>': (read_vector, 'stats_var'),
-        '<TestMode>': (read_bool, 'test_mode'),
+        '<Dim>': (_read_int, 'dim'),
+        '<BlockDim>': (_read_int, 'block_dim'),
+        '<Epsilon>': (_read_float, 'epsilon'),
+        '<TargetRms>': (_read_float, 'target_rms'),
+        '<Count>': (_read_float, 'count'),
+        '<StatsMean>': (_read_vector_float, 'stats_mean'),
+        '<StatsVar>': (_read_vector_float, 'stats_var'),
+        '<TestMode>': (_read_bool, 'test_mode'),
     }
     return actions
 
@@ -133,14 +134,14 @@ class BatchNormComponent(Component):
 class LinearComponent(Component):
   """LinearComponent."""
 
-  def _actions(self):
+  def _actions(self) -> Dict:
     """See baseclass document."""
     actions = {
-        '<Params>': (read_matrix, 'params'),
-        '<RankInOut>': (read_int, 'rank_inout'),
-        '<UpdatedPeriod>': (read_int, 'updated_period'),
-        '<NumSamplesHistory>': (read_float, 'num_samples_history'),
-        '<Alpha>': (read_float, 'alpha')
+        '<Params>': (_read_matrix_trans, 'params'),
+        '<RankInOut>': (_read_int, 'rank_inout'),
+        '<UpdatedPeriod>': (_read_int, 'updated_period'),
+        '<NumSamplesHistory>': (_read_float, 'num_samples_history'),
+        '<Alpha>': (_read_float, 'alpha')
     }
     return actions
 
@@ -148,16 +149,16 @@ class LinearComponent(Component):
 class NonlinearComponent(Component):
   """NonlinearComponent."""
 
-  def _actions(self):
+  def _actions(self) -> Dict:
     """See baseclass document."""
     actions = {
-        '<Dim>': (read_int, 'dim'),
-        '<BlockDim>': (read_int, 'block_dim'),
-        '<ValueAvg>': (read_vector, 'value_avg'),
-        '<DerivAvg>': (read_vector, 'deriv_avg'),
-        '<OderivRms>': (read_vector, 'oderiv_rms'),
-        '<Count>': (read_float, 'count'),
-        '<OderivCount>': (read_float, 'oderiv_count')
+        '<Dim>': (_read_int, 'dim'),
+        '<BlockDim>': (_read_int, 'block_dim'),
+        '<ValueAvg>': (_read_vector_float, 'value_avg'),
+        '<DerivAvg>': (_read_vector_float, 'deriv_avg'),
+        '<OderivRms>': (_read_vector_float, 'oderiv_rms'),
+        '<Count>': (_read_float, 'count'),
+        '<OderivCount>': (_read_float, 'oderiv_count')
     }
     return actions
 
@@ -173,26 +174,26 @@ class RectifiedLinearComponent(NonlinearComponent):
 class PermuteComponent(Component):
   """PermuteComponent."""
 
-  def _actions(self):
+  def _actions(self) -> Dict:
     """See baseclass document."""
-    return {'<ColumnMap>': (read_vector, 'column_map')}
+    return {'<ColumnMap>': (_read_vector_float, 'column_map')}
 
 
 class TdnnComponent(Component):
   """TdnnComponent."""
 
-  def _actions(self):
+  def _actions(self) -> Dict:
     """See baseclass document."""
     actions = {
-        '<TimeOffsets>': (read_vector_int, 'time_offsets'),
-        '<LinearParams>': (read_matrix, 'params'),
-        '<BiasParams>': (read_vector, 'bias'),
-        '<OrthonormalConstraint>': (read_float, 'orthonormal_constraint'),
-        '<UseNaturalGradient>': (read_bool, 'use_natrual_gradient'),
-        '<RankInOut>': (read_int, 'rank_inout'),
-        '<NumSamplesHistory>': (read_float, 'num_samples_history'),
-        '<Alpha>': (read_float, 'alpha'),
-        '<AlphaInOut>': (read_float, 'alpha_inout'),
+        '<TimeOffsets>': (_read_vector_int, 'time_offsets'),
+        '<LinearParams>': (_read_matrix_trans, 'params'),
+        '<BiasParams>': (_read_vector_float, 'bias'),
+        '<OrthonormalConstraint>': (_read_float, 'orthonormal_constraint'),
+        '<UseNaturalGradient>': (_read_bool, 'use_natrual_gradient'),
+        '<RankInOut>': (_read_int, 'rank_inout'),
+        '<NumSamplesHistory>': (_read_float, 'num_samples_history'),
+        '<Alpha>': (_read_float, 'alpha'),
+        '<AlphaInOut>': (_read_float, 'alpha_inout'),
     }
     return actions
 
@@ -213,3 +214,232 @@ class Components(Enum):
   PermuteComponent = PermuteComponent
   RectifiedLinearComponent = RectifiedLinearComponent
   TdnnComponent = TdnnComponent
+
+
+def read_next_token(line: str, pos: int) -> Tuple[Optional[str], int]:
+  """Read next token from line.
+
+  Args:
+    line: line.
+    pos: current position.
+
+  Returns:
+    Token (None if not found) and current position.
+  """
+  assert isinstance(line, str) and isinstance(pos, int)
+  assert pos >= 0
+
+  while pos < len(line) and line[pos].isspace():
+    pos += 1
+  if pos >= len(line):
+    return None, pos
+
+  initial_pos = pos
+  while pos < len(line) and not line[pos].isspace():
+    pos += 1
+  token = line[initial_pos:pos]
+  return token, pos
+
+
+def read_component_type(line: str, pos: int) -> Tuple[str, int]:
+  """Read component type from line.
+
+    Args:
+    line: line.
+    pos: current position.
+
+  Returns:
+    component type and current position.
+  """
+  component_type, pos = read_next_token(line, pos)
+  if (isinstance(component_type, str) and len(component_type) >= 13 and
+      component_type[0] == "<" and component_type[-10:] == "Component>"):
+    return component_type, pos
+  else:
+    raise ValueError(f'error reading Component: at position {pos}, '
+                     f'expected <xxxxComponent>,got: {component_type}.')
+
+
+def _read_bool(line: str, pos: int, line_buffer: TextIO) -> Tuple[bool, int]:
+  """Read bool value from line.
+
+  Args:
+    line: line.
+    pos: current position.
+    line_buffer: line buffer for nnet3 file.
+
+  Returns:
+    bool value and current position.
+  """
+  tok, pos = read_next_token(line, pos)
+  if tok in ['F', 'False', 'false']:
+    return False, pos
+  elif tok in ['T', 'True', 'true']:
+    return True, pos
+  else:
+    raise ValueError(f'at file position {pos}, expected bool but got {tok}.')
+
+
+def _read_int(line: str, pos: int, line_buffer: TextIO) -> Tuple[int, int]:
+  """Read int value from line.
+
+  Args:
+    line: line.
+    pos: current position.
+    line_buffer: line buffer for nnet3 file.
+
+  Returns:
+    int value and current position.
+  """
+  tok, pos = read_next_token(line, pos)
+  return int(tok), pos
+
+
+def _read_float(line: str, pos: int, line_buffer: TextIO) -> Tuple[float, int]:
+  """Read float value from line.
+
+  Args:
+    line: line.
+    pos: current position.
+    line_buffer: line buffer for nnet3 file.
+
+  Returns:
+    float value and current position.
+  """
+  tok, pos = read_next_token(line, pos)
+  return float(tok), pos
+
+
+def __read_vector(line: str, pos: int,
+                  line_buffer: TextIO) -> Tuple[np.array, int]:
+  """Read vector from line.
+
+  Args:
+    line: line.
+    pos: current position.
+    line_buffer: line buffer for nnet3 file.
+
+  Returns:
+    vector and current position.
+  """
+  tok, pos = read_next_token(line, pos)
+  if tok != '[':
+    raise ValueError(f"Error at line position {pos}, expected [ but got {tok}.")
+
+  vector = []
+  while True:
+    tok, pos = read_next_token(line, pos)
+    if tok == ']':
+      break
+    if tok is None:
+      line = next(line_buffer)
+      if line is None:
+        raise ValueError("Encountered EOF while reading vector.")
+      else:
+        pos = 0
+        continue
+
+    vector.append(tok)
+
+  if tok is None:
+    raise ValueError("Encountered EOF while reading vector.")
+  return vector, pos
+
+
+def _read_vector_int(line: str, pos: int,
+                     line_buffer: TextIO) -> Tuple[np.array, int]:
+  """Read int vector from line.
+
+  Args:
+    line: line.
+    pos: current position.
+    line_buffer: line buffer for nnet3 file.
+
+  Returns:
+    float int and current position.
+  """
+  vector, pos = __read_vector(line, pos, line_buffer)
+  return np.array([int(v) for v in vector], dtype=np.int), pos
+
+
+def _read_vector_float(line: str, pos: int,
+                       line_buffer: TextIO) -> Tuple[np.array, int]:
+  """Read float vector from line.
+
+  Args:
+    line: line.
+    pos: current position.
+    line_buffer: line buffer for nnet3 file.
+
+  Returns:
+    float vector and current position.
+  """
+  vector, pos = __read_vector(line, pos, line_buffer)
+  return np.array([float(v) for v in vector], dtype=np.float32), pos
+
+
+def __check_for_newline(line: str, pos: int) -> Tuple[bool, int]:
+  """Check if line is newline.
+
+  Args:
+    line: line.
+    pos: current position.
+
+  Returns:
+    bool and current position.
+  """
+  assert isinstance(line, str) and isinstance(pos, int)
+  assert pos >= 0
+  saw_newline = False
+  while pos < len(line) and line[pos].isspace():
+    if line[pos] == "\n":
+      saw_newline = True
+    pos += 1
+  return saw_newline, pos
+
+
+def _read_matrix_trans(line: str, pos: int,
+                       line_buffer: TextIO) -> Tuple[np.array, int]:
+  """Read matrix transpose from line.
+
+  Args:
+    line: line.
+    pos: current position.
+    line_buffer: line buffer for nnet3 file.
+
+  Returns:
+    matrix transpose and current position.
+  """
+  tok, pos = read_next_token(line, pos)
+  if tok != '[':
+    raise ValueError(f"Error at line position {pos}, expected [ but got {tok}.")
+
+  mat = []
+  while True:
+    one_row = []
+    while True:
+      tok, pos = read_next_token(line, pos)
+      if tok == '[':
+        tok, pos = read_next_token(line, pos)
+
+      if tok == ']' or tok is None:
+        break
+      else:
+        one_row.append(float(tok))
+
+      saw_newline, pos = __check_for_newline(line, pos)
+      if saw_newline:  # Newline terminates each row of the matrix.
+        break
+
+    if len(one_row) > 0:
+      mat.append(one_row)
+    if tok == ']':
+      break
+    if tok is None:
+      line = next(line_buffer)
+      if line is None:
+        raise ValueError("Encountered EOF while reading matrix.")
+      else:
+        pos = 0
+
+  return np.transpose(np.array(mat, dtype=np.float32)), pos
