@@ -540,7 +540,7 @@ class Parser:
 
     component_type = component_type[1:-1]
     if component_type in self.__type_to_component:
-      component = self.__type_to_component[component_type]
+      component = self.__type_to_component[component_type]()
       component.read_params(self.__line_buffer, line, pos, terminating_tokens)
       return component
     else:
