@@ -41,7 +41,6 @@ KaldiOpRawType = {
     "NoOpComponent": "NoOp",
     "PermuteComponent": 'Permute',
     "RectifiedLinearComponent": 'Relu',
-    "RepeatedAffineComponent": 'Gemm',
     "ScaleComponent": 'Scale',
     "TdnnComponent": 'Tdnn',
 }
@@ -56,23 +55,6 @@ class Descriptor(Enum):
   ReplaceIndex = "ReplaceIndex"
   Scale = "Scale"
   Sum = "Sum"
-
-
-Components = [
-    'AffineComponent',
-    'BatchNormComponent',
-    'FixedAffineComponent',
-    'GeneralDropoutComponent',
-    'LinearComponent',
-    'LogSoftmaxComponent',
-    'NaturalGradientAffineComponent',
-    'NonlinearComponent',
-    'NoOpComponent',
-    'PermuteComponent',
-    'RectifiedLinearComponent',
-    'TdnnComponent',
-]
-Component = Enum('Component', [(op, op) for op in Components], type=str)
 
 
 ATTRIBUTE_NAMES = {
