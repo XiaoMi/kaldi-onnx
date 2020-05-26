@@ -6,7 +6,7 @@ import re
 from typing import Dict, List, Optional, TextIO
 
 from converter.common import *
-from converter.component import Components
+from converter.component import Component, Components
 from converter.utils import *
 
 

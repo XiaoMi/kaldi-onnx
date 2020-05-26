@@ -10,24 +10,6 @@ from converter.common import KaldiOpRawType
 from converter.utils import *
 
 
-@unique
-class Components(Enum):
-  """Kaldi nnet3 Components."""
-
-  AffineComponent: AffineComponent
-  BatchNormComponent: BatchNormComponent
-  FixedAffineComponent: FixedAffineComponent
-  GeneralDropoutComponent: GeneralDropoutComponent
-  LinearComponent: LinearComponent
-  LogSoftmaxComponent: LogSoftmaxComponent
-  NaturalGradientAffineComponent: NaturalGradientAffineComponent
-  NonlinearComponent: NonlinearComponent
-  NoOpComponent: NoOpComponent
-  PermuteComponent: PermuteComponent
-  RectifiedLinearComponent: RectifiedLinearComponent
-  TdnnComponent: TdnnComponent
-
-
 class Component(metaclass=ABCMeta):
   """Kaldi nnet3 component.
 
@@ -213,3 +195,21 @@ class TdnnComponent(Component):
         '<AlphaInOut>': (read_float, 'alpha_inout'),
     }
     return actions
+
+
+@unique
+class Components(Enum):
+  """Kaldi nnet3 Components."""
+
+  AffineComponent: AffineComponent
+  BatchNormComponent: BatchNormComponent
+  FixedAffineComponent: FixedAffineComponent
+  GeneralDropoutComponent: GeneralDropoutComponent
+  LinearComponent: LinearComponent
+  LogSoftmaxComponent: LogSoftmaxComponent
+  NaturalGradientAffineComponent: NaturalGradientAffineComponent
+  NonlinearComponent: NonlinearComponent
+  NoOpComponent: NoOpComponent
+  PermuteComponent: PermuteComponent
+  RectifiedLinearComponent: RectifiedLinearComponent
+  TdnnComponent: TdnnComponent
