@@ -11,7 +11,16 @@ from converter.utils import *
 
 
 class Parser:
-  """Kaldi nnet3 model parser."""
+  """Kaldi nnet3 model parser.
+
+  Attributes:
+    __name_to_component: {name: component_dict}.
+    __num_components: number of components.
+    __line_buffer: line buffer for nnet3 file.
+    __pos: position for read lines.
+    __current_id: current component id.
+    __type_to_component: {type_name: Component}.
+  """
 
   def __init__(self, line_buffer: TextIO):
     """Initialize.
@@ -77,7 +86,7 @@ class Parser:
     Returns:
       Parsed component dict.
     """
-    pattern = '^input-node|^output-node|^component|^component-node|'
+    pattern = '^input-node|^output-node|^component|^component-node'
     if re.search(pattern, line.strip()) is None:
       return None
 
@@ -186,8 +195,8 @@ class Parser:
     Returns:
       Descriptor or not.
     """
-    for descriptor_name in Descriptor.value:
-      if node_type == descriptor_name:
+    for descriptor in Descriptor:
+      if node_type == descriptor.value:
         return True
     return False
 
@@ -235,13 +244,14 @@ class Parser:
 
     if num_inputs == len(offset_inputs) and len(pure_inputs) == 1:
       self.__current_id += 1
-      component_name = 'splice_' + str(self.__current_id)
+      component_name = f'splice_{self.__current_id}'
       component = {
           'id': self.__current_id,
           'type': 'Splice',
           'name': component_name,
           'input': pure_inputs,
-          'context': offsets}
+          'context': offsets
+      }
 
       for item in offset_components:
         components.remove(item)
@@ -251,13 +261,14 @@ class Parser:
       if (len(pure_inputs) == 1 and len(splice_indexes) == 1 and
           len(offset_inputs) > 1):
         self.__current_id += 1
-        splice_comp_name = 'splice_' + str(self.__current_id)
+        splice_comp_name = f'splice_{self.__current_id}'
         splice_component = {
             'id': self.__current_id,
             'type': 'Splice',
             'name': splice_comp_name,
             'context': offsets,
-            'input': pure_inputs}
+            'input': pure_inputs
+        }
 
         new_append_inputs = []
         for i in range(num_inputs):
@@ -272,18 +283,22 @@ class Parser:
         components.append(splice_component)
 
       self.__current_id += 1
-      component_name = 'append_' + str(self.__current_id)
+      component_name = f'append_{self.__current_id}'
       component = {
           'id': self.__current_id,
           'type': 'Append',
           'name': component_name,
-          'input': append_inputs}
+          'input': append_inputs
+      }
       components.append(component)
     return component_name
 
   def __parse_offset_descriptor(self, input_str: str,
                                 components: List[Optional[Dict]]) -> str:
     """Parse kaldi Offset descriptor.
+
+    For example, Offset(input,-1) will be parsed to Offset component
+    'input.Offset.-1', input names is ['input'], and offset is -1.
 
     Args:
       input_str: input string.
@@ -303,7 +318,7 @@ class Parser:
 
     offset = int(items[1])
     self.__current_id += 1
-    component_name = input_name + '.Offset.' + str(offset)
+    component_name = f'{input_name}.Offset.{offset}'
     component = {
         'id': self.__current_id,
         'type': 'Offset',
@@ -334,15 +349,15 @@ class Parser:
     else:
       input_name = items[0]
 
-    component_name = input_name + '.ReplaceIndex.' + items[1] + items[2]
+    component_name = f'{input_name}.ReplaceIndex.{items[1]}{items[2]}'
     self.__current_id += 1
     component = {
         'id': self.__current_id,
         'type': 'ReplaceIndex',
         'name': component_name,
         'input': [input_name],
-        'var_name': items[1],
-        'modulus': int(items[2])}
+        'var_name': items[1]
+    }
     components.append(component)
     return component_name
 
@@ -367,7 +382,7 @@ class Parser:
     else:
       input_name = items[1]
 
-    component_name = input_name + '.Scale.' + items[0]
+    component_name = f'{input_name}.Scale.{items[0]}'
     self.__current_id += 1
     component = {
         'id': self.__current_id,
@@ -441,11 +456,11 @@ class Parser:
           num += 1
       elif tok == '</Nnet3>':
         assert num == self.__num_components
-        logging.info(f"Finished parsing nnet3 {num} components.")
+        logging.info(f'Finished parsing nnet3 {num} components.')
         break
       else:
-        raise ValueError(f"Error reading component at position {pos}, "
-                         f"expected <ComponentName>, got: {tok}.")
+        raise ValueError(f'Error reading component at position {pos}, '
+                         f'expected <ComponentName>, got: {tok}.')
 
   def __read_component(self, line, pos, component_type) -> Component:
     """Read component.
@@ -458,7 +473,7 @@ class Parser:
     Returns:
       Component.
     """
-    terminating_token = "</" + component_type[1:]
+    terminating_token = f"</{component_type[1:]}"
     terminating_tokens = {terminating_token, '<ComponentName>'}
 
     component_type = component_type[1:-1]
@@ -467,4 +482,4 @@ class Parser:
       component.read_params(self.__line_buffer, line, pos, terminating_tokens)
       return component
     else:
-      raise NotImplementedError(f"Component: {component_type} not supported.")
+      raise NotImplementedError(f'Component: {component_type} not supported.')
