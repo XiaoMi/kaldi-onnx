@@ -6,7 +6,7 @@ import logging
 import re
 from typing import Dict, List, Optional, TextIO
 
-from converter.common import *
+from converter.common import Descriptor, KaldiOpRawType
 from converter.component import (Component, Components, read_component_type,
                                  read_next_token)
 from converter.utils import kaldi_check
@@ -19,8 +19,7 @@ class Parser:
     __name_to_component: {name: component_dict}.
     __num_components: number of components.
     __line_buffer: line buffer for nnet3 file.
-    __pos: position for read lines.
-    __current_id: current component id.
+    __current_id: id for current parsed component.
     __type_to_component: {type_name: Component}.
   """
 
@@ -33,12 +32,15 @@ class Parser:
     self.__name_to_component = dict()
     self.__num_components = 0
     self.__line_buffer = line_buffer
-    self.__pos = 0
     self.__current_id = 0
     self.__type_to_component = {c.value.__name__: c.value for c in Components}
 
   def run(self) -> List:
-    """Start parse nnet3 model file."""
+    """Start parse nnet3 model file.
+
+    Returns:
+      Component list.
+    """
     self.__check_header()
     self.__parse_nnet3_configs()
     self.__parse_component_lines()
@@ -55,7 +57,7 @@ class Parser:
     while True:
       line = next(self.__line_buffer, 'Parser_EOF')
       if line == 'Parser_EOF':
-        raise ValueError('No <NumComponents> in File.')
+        raise ValueError('No <NumComponents> in file.')
 
       if line.startswith('<NumComponents>'):
         self.__num_components = int(line.split()[1])
@@ -246,19 +248,19 @@ class Parser:
     ln = [0]
     nb_brackets = 0
     for i, c in enumerate(sentence):
-      if c == "(":
+      if c == '(':
         nb_brackets += 1
-      elif c == ")":
+      elif c == ')':
         nb_brackets -= 1
       elif c == separator and nb_brackets == 0:
         ln.append(i)
 
       if nb_brackets < 0:
-        raise ValueError(f"Syntax error: {sentence}.")
+        raise ValueError(f'Syntax error: {sentence}.')
 
     ln.append(len(sentence))
     if nb_brackets > 0:
-      raise Exception("Syntax error")
+      raise ValueError(f'Syntax error: {sentence}.')
 
     return [sentence[i:j].strip(separator) for i, j in zip(ln, ln[1:])]
 
@@ -275,7 +277,7 @@ class Parser:
     """
     items = self.__parenthesis_split(input_str)
     num_inputs = len(items)
-    kaldi_check(num_inputs >= 2, "Append should have at least two inputs.")
+    kaldi_check(num_inputs >= 2, 'Append should have at least two inputs.')
 
     append_inputs = []
     offset_components = []
@@ -301,9 +303,7 @@ class Parser:
         offset_indexes.append(items.index(item))
         append_inputs.append(item)
 
-    # check if fusing to splice needed
     pure_inputs = list(set(offset_inputs))
-
     if num_inputs == len(offset_inputs) and len(pure_inputs) == 1:
       self.__current_id += 1
       component_name = f'splice_{self.__current_id}'
@@ -437,7 +437,6 @@ class Parser:
     items = self.__parenthesis_split(input_str)
     kaldi_check(len(items) == 2, 'Scale descriptor should have 2 items.')
 
-    scale = float(items[0])
     sub_type = self.__parse_sub_type(items[1])
     if sub_type is not None:
       input_name = self.__parse_descriptor(sub_type, items[1], components)
@@ -451,7 +450,7 @@ class Parser:
         'type': 'Scale',
         'name': component_name,
         'input': [input_name],
-        'scale': scale
+        'scale': float(items[0])
     }
     components.append(component)
     return component_name
@@ -502,8 +501,7 @@ class Parser:
         line = next(self.__line_buffer)
         pos = 0
         if line is None:
-          logging.error("unexpected EOF on line:\n {}".format(line))
-          break
+          raise ValueError(f'Unexpected EOF on line: {line}.')
         else:
           tok, pos = read_next_token(line, pos)
 
