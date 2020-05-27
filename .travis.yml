@@ -4,7 +4,7 @@ jobs:
   include:
     - stage: check
       script: python3 -m pylint --indent-string='  ' --max-line-length=80
-              --disable=no-else-return,too-few-public-methods,missing-function-docstring,invalid-name,too-many-public-methods
+              --disable=no-else-return,too-few-public-methods,logging-fstring-interpolation
               converter tests
 #    - stage: test
 #      script: python3 -m unittest tests/tests.py
