@@ -124,7 +124,7 @@ class Parser:
 
   def __parse_component_input(self, input_str) -> List[str]:
     """Parse input of one component.
-    
+
     Args:
       input_str: input string.
 
@@ -161,6 +161,8 @@ class Parser:
         return input_str[0: bracket_index]
       else:
         return None
+    else:
+      return None
 
   def __parse_descriptor(self, sub_type, input_str, sub_components) -> str:
     """Parse kaldi descriptor.
@@ -170,7 +172,7 @@ class Parser:
       input_str: input string.
       sub_components: sub component list,
                       may change if new sub component is parsed.
-    
+
     Returns:
       Component name.
     """
@@ -245,25 +247,26 @@ class Parser:
     separator = ','
     sentence = sentence.strip(separator)
 
-    ln = [0]
+    lns = [0]
     nb_brackets = 0
-    for i, c in enumerate(sentence):
-      if c == '(':
+    for i, char in enumerate(sentence):
+      if char == '(':
         nb_brackets += 1
-      elif c == ')':
+      elif char == ')':
         nb_brackets -= 1
-      elif c == separator and nb_brackets == 0:
-        ln.append(i)
+      elif char == separator and nb_brackets == 0:
+        lns.append(i)
 
       if nb_brackets < 0:
         raise ValueError(f'Syntax error: {sentence}.')
 
-    ln.append(len(sentence))
+    lns.append(len(sentence))
     if nb_brackets > 0:
       raise ValueError(f'Syntax error: {sentence}.')
 
-    return [sentence[i:j].strip(separator) for i, j in zip(ln, ln[1:])]
+    return [sentence[i:j].strip(separator) for i, j in zip(lns, lns[1:])]
 
+  # pylint: disable=too-many-locals
   def __parse_append_descriptor(self, input_str: str,
                                 components: List[Optional[Dict]]) -> str:
     """Parse kaldi Append descriptor.
@@ -502,8 +505,8 @@ class Parser:
         pos = 0
         if line is None:
           raise ValueError(f'Unexpected EOF on line: {line}.')
-        else:
-          tok, pos = read_next_token(line, pos)
+
+        tok, pos = read_next_token(line, pos)
 
       if tok == '<ComponentName>':
         component_name, pos = read_next_token(line, pos)
