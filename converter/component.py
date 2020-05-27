@@ -58,10 +58,10 @@ class Component(metaclass=ABCMeta):
       if token is None:
         line = next(line_buffer)
         if line is None:
-          raise ValueError(f'Error parsing nnet3 file.')
-        else:
-          pos = 0
-          continue
+          raise ValueError('Error parsing nnet3 file.')
+
+        pos = 0
+        continue
 
       if token in actions:
         func, name = actions[token]
@@ -171,14 +171,6 @@ class RectifiedLinearComponent(NonlinearComponent):
   """RectifiedLinearComponent."""
 
 
-class PermuteComponent(Component):
-  """PermuteComponent."""
-
-  def _actions(self) -> Dict:
-    """See baseclass document."""
-    return {'<ColumnMap>': (_read_vector_float, 'column_map')}
-
-
 class TdnnComponent(Component):
   """TdnnComponent."""
 
@@ -211,7 +203,6 @@ class Components(Enum):
   NaturalGradientAffineComponent = NaturalGradientAffineComponent
   NonlinearComponent = NonlinearComponent
   NoOpComponent = NoOpComponent
-  PermuteComponent = PermuteComponent
   RectifiedLinearComponent = RectifiedLinearComponent
   TdnnComponent = TdnnComponent
 
@@ -231,20 +222,20 @@ def read_next_token(line: str, pos: int) -> Tuple[Optional[str], int]:
 
   while pos < len(line) and line[pos].isspace():
     pos += 1
+
   if pos >= len(line):
     return None, pos
 
   initial_pos = pos
   while pos < len(line) and not line[pos].isspace():
     pos += 1
-  token = line[initial_pos:pos]
-  return token, pos
+  return line[initial_pos:pos], pos
 
 
 def read_component_type(line: str, pos: int) -> Tuple[str, int]:
   """Read component type from line.
 
-    Args:
+  Args:
     line: line.
     pos: current position.
 
@@ -256,10 +247,11 @@ def read_component_type(line: str, pos: int) -> Tuple[str, int]:
       component_type[0] == '<' and component_type[-10:] == 'Component>'):
     return component_type, pos
   else:
-    raise ValueError(f'error reading Component: at position {pos}, '
-                     f'expected <xxxComponent>,got: {component_type}.')
+    raise ValueError(f'Error reading Component at position {pos}, '
+                     f'expected <xxxComponent>, got: {component_type}.')
 
 
+# pylint: disable = unused-argument
 def _read_bool(line: str, pos: int, line_buffer: TextIO) -> Tuple[bool, int]:
   """Read bool value from line.
 
@@ -277,9 +269,10 @@ def _read_bool(line: str, pos: int, line_buffer: TextIO) -> Tuple[bool, int]:
   elif tok in ['T', 'True', 'true']:
     return True, pos
   else:
-    raise ValueError(f'at file position {pos}, expected bool but got {tok}.')
+    raise ValueError(f'Error at position {pos}, expected bool but got {tok}.')
 
 
+# pylint: disable = unused-argument
 def _read_int(line: str, pos: int, line_buffer: TextIO) -> Tuple[int, int]:
   """Read int value from line.
 
@@ -295,6 +288,7 @@ def _read_int(line: str, pos: int, line_buffer: TextIO) -> Tuple[int, int]:
   return int(tok), pos
 
 
+# pylint: disable = unused-argument
 def _read_float(line: str, pos: int, line_buffer: TextIO) -> Tuple[float, int]:
   """Read float value from line.
 
@@ -335,9 +329,9 @@ def __read_vector(line: str, pos: int,
       line = next(line_buffer)
       if line is None:
         raise ValueError('Encountered EOF while reading vector.')
-      else:
-        pos = 0
-        continue
+
+      pos = 0
+      continue
 
     vector.append(tok)
 
@@ -390,6 +384,7 @@ def __check_for_newline(line: str, pos: int) -> Tuple[bool, int]:
   """
   assert isinstance(line, str) and isinstance(pos, int)
   assert pos >= 0
+
   saw_newline = False
   while pos < len(line) and line[pos].isspace():
     if line[pos] == '\n':
@@ -424,8 +419,8 @@ def _read_matrix_trans(line: str, pos: int,
 
       if tok == ']' or tok is None:
         break
-      else:
-        one_row.append(float(tok))
+
+      one_row.append(float(tok))
 
       saw_newline, pos = __check_for_newline(line, pos)
       if saw_newline:  # Newline terminates each row of the matrix.
@@ -439,7 +434,6 @@ def _read_matrix_trans(line: str, pos: int,
       line = next(line_buffer)
       if line is None:
         raise ValueError('Encountered EOF while reading matrix.')
-      else:
-        pos = 0
+      pos = 0
 
   return np.transpose(np.array(mat, dtype=np.float32)), pos
