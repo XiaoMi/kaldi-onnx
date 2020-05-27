@@ -140,7 +140,7 @@ class Node:
 
   def read_attribute(self, attr_name: str):
     """Read attribute by name."""
-    kaldi_check(attr_name in self.attrs, f"cannot find attribute {attr_name}.")
+    kaldi_check(attr_name in self.attrs, f'cannot find attribute {attr_name}.')
     return self.attrs[attr_name]
 
   def inference_dim(self, name_to_dim: Dict[str, int],
@@ -162,7 +162,7 @@ class Node:
         self.input_dim = output_dim
       else:
         kaldi_check(self.inputs[0] in name_to_node,
-                    f"Cannot find node:{self.inputs[0]}")
+                    f'Cannot find: {self.inputs[0]}.')
         input_node = name_to_node[self.inputs[0]]
         input_node.inference_dim(name_to_dim, name_to_node)
         self.input_dim = input_node.output_dim
@@ -191,21 +191,21 @@ class Node:
       input_indexes = name_to_indexes[input_name]
       self.input_indexes = input_indexes
     else:
-      kaldi_check(input_name in name_to_node, f'Cannot find node: {input_name}')
+      kaldi_check(input_name in name_to_node, f'Cannot find: {input_name}')
       input_node = name_to_node[input_name]
       input_node.inference_index(name_to_indexes, name_to_node)
       input_indexes = name_to_indexes[input_name]
       self.input_indexes = input_indexes
     name_to_indexes[self.name] = self.output_indexes
     kaldi_check(set(self.dependencies) <= set(self.input_indexes),
-                "input indexes is sufficient for computation")
+                'input indexes is sufficient for computation')
 
   def inference_dependencies(self,
                              output_indexes,
                              name_to_dependencies,
                              name_to_node,
                              subsample_factor):
-    kaldi_check(len(output_indexes) > 0, "invalid output indexes values.")
+    kaldi_check(len(output_indexes) > 0, 'invalid output indexes values.')
     dependencies = list()
     [start, end] = self.input_range
     current_output_indexes = list()
@@ -230,7 +230,7 @@ class Node:
       if input_name in name_to_range:
         [start, end] = name_to_range[input_name]
       else:
-        kaldi_check(input_name in name_to_node, f"Cannot find node: {input_name}")
+        kaldi_check(input_name in name_to_node, f'Cannot find: {input_name}')
         input_node = name_to_node[input_name]
         input_node.inference_range(name_to_range, name_to_node)
         [start, end] = input_node.output_range
@@ -248,7 +248,7 @@ class GemmNode(Node):
       num_repeats = 1
     weights_name = self.inputs[1]
     kaldi_check(weights_name in self.consts,
-                f"{weights_name} is not found in const.")
+                f'{weights_name} is not found in const.')
     weights_shape = self.consts[weights_name].shape
     output_dim = weights_shape[0] * num_repeats
     self.output_dim = output_dim
@@ -265,8 +265,7 @@ class AppendNode(Node):
       if input_name in name_to_dim:
         input_dim = name_to_dim[input_name]
       else:
-        kaldi_check(input_name in name_to_node,
-                    "Cannot find %s'." % input_name)
+        kaldi_check(input_name in name_to_node, f'Cannot find {input_name}')
         input_node = name_to_node[input_name]
         input_node.inference_dim(name_to_dim, name_to_node)
         input_dim = input_node.output_dim
@@ -284,7 +283,7 @@ class AppendNode(Node):
     self.input_indexes = input_indexes
     name_to_indexes[self.name] = self.output_indexes
     kaldi_check(set(self.dependencies) <= set(self.input_indexes),
-                "input indexes is sufficient for computation")
+                'input indexes is sufficient for computation')
 
   def inference_range(self, name_to_range, name_to_node):
     if self.name not in name_to_range:
@@ -294,7 +293,7 @@ class AppendNode(Node):
           [input_start, input_end] = name_to_range[input_name]
         else:
           kaldi_check(input_name in name_to_node,
-                      f"Cannot find node: {input_name}.")
+                      f'Cannot find: {input_name}.')
           input_node = name_to_node[input_name]
           input_node.inference_range(name_to_range, name_to_node)
           [input_start, input_end] = input_node.output_range
@@ -312,7 +311,7 @@ class IdentityNode(Node):
       input_indexes = name_to_indexes[input_name]
     else:
       kaldi_check(input_name in name_to_node,
-                  f"Cannot find node: {input_name}.")
+                  f'Cannot find: {input_name}.')
       input_node = name_to_node[input_name]
       input_node.inference_index(name_to_indexes, name_to_node)
       input_indexes = name_to_indexes[input_name]
@@ -334,7 +333,7 @@ class OffsetNode(Node):
         [input_start, input_end] = name_to_range[input_name]
       else:
         kaldi_check(input_name in name_to_node,
-                    f"Cannot find node: {input_name}.")
+                    f'Cannot find: {input_name}.')
         input_node = name_to_node[input_name]
         input_node.inference_range(name_to_range, name_to_node)
         [input_start, input_end] = input_node.output_range
@@ -348,7 +347,7 @@ class OffsetNode(Node):
     for idx in self.output_indexes:
       dep = idx + offset
       kaldi_check(dep in self.input_indexes,
-                  f"input index {dep} is required.")
+                  f'Input index {dep} is required.')
       pos = self.input_indexes.index(dep)
       forward_indexes.append(pos)
     self.attrs['forward_indexes'] = forward_indexes
@@ -356,7 +355,7 @@ class OffsetNode(Node):
   def inference_dependencies(self, output_indexes, name_to_dependencies,
                              name_to_node, subsample_factor):
     kaldi_check(len(output_indexes) > 0,
-                "number of output indexes should be greater than zero.")
+                'number of output indexes should be greater than zero.')
     offset = self.read_attribute('offset')
     current_output_indexes = list()
     for i in output_indexes:
@@ -396,7 +395,7 @@ class ReplaceIndexNode(Node):
   def inference_dependencies(self, output_indexes, name_to_dependencies,
                              name_to_node, subsample_factor):
     kaldi_check(len(output_indexes) > 0,
-                "number of output indexes should be greater than zero.")
+                'number of output indexes should be greater than zero.')
     dependencies = list()
     chunk_size = self.read_attribute('chunk_size')
     for i in output_indexes:
@@ -418,7 +417,7 @@ class ReplaceIndexNode(Node):
     for idx in self.output_indexes:
       dep = int(idx // modulus) * modulus
       kaldi_check(dep in self.input_indexes,
-                  f"{self.name} cannot compute index: {dep}.")
+                  f'{self.name} cannot compute index: {dep}.')
       pos = self.input_indexes.index(dep)
       forward_indexes.append(pos)
     self.attrs['forward_indexes'] = forward_indexes
@@ -438,7 +437,7 @@ class SpliceNode(Node):
         input_dim = name_to_dim[input_name]
       else:
         kaldi_check(input_name in name_to_node,
-                    "Cannot find node: %s" % input_name)
+                    f'Cannot find : {input_name}')
         input_node = name_to_node[input_name]
         input_node.inference_dim(name_to_dim, name_to_node)
         input_dim = input_node.output_dim
@@ -463,7 +462,7 @@ class SpliceNode(Node):
         [input_start, input_end] = name_to_range[input_name]
       else:
         kaldi_check(input_name in name_to_node,
-                    f"Cannot find node: {input_name}.")
+                    f'Cannot find: {input_name}.')
         input_node = name_to_node[input_name]
         input_node.inference_range(name_to_range, name_to_node)
         [input_start, input_end] = input_node.output_range
@@ -480,7 +479,7 @@ class SpliceNode(Node):
                              name_to_node,
                              subsample_factor):
     kaldi_check(len(output_indexes) > 0,
-                "number of output indexes should be greater than zero.")
+                'number of output indexes should be greater than zero.')
     dependencies = list()
     context = self.read_attribute('context')
     for i in output_indexes:
@@ -509,7 +508,7 @@ class SpliceNode(Node):
     for idx in self.output_indexes:
       computed_indexes = [idx + c for c in context]
       kaldi_check(set(computed_indexes) <= set(self.input_indexes),
-                  "Splice is not computable.")
+                  'Splice is not computable.')
       forward_index = [self.input_indexes.index(i) for i in computed_indexes]
       forward_indexes.extend(forward_index)
       if const_dim > 0:
@@ -526,7 +525,7 @@ class SubsampleNode(Node):
     forward_indexes = list()
     for idx in self.output_indexes:
       kaldi_check(idx in self.input_indexes,
-                  f"{self.name} cannot compute index: {idx}")
+                  f'{self.name} cannot compute index: {idx}')
       pos = self.input_indexes.index(idx)
       forward_indexes.append(pos)
     self.set_attribute('forward_indexes', forward_indexes)
