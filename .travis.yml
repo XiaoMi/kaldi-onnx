@@ -5,6 +5,6 @@ jobs:
     - stage: check
       script: python3 -m pylint --indent-string='  ' --max-line-length=80
               --disable=no-else-return,too-few-public-methods,logging-fstring-interpolation
-              converter tests
+              converter/utils.py converter/parser.py converter/component.py
 #    - stage: test
 #      script: python3 -m unittest tests/tests.py
