@@ -1,23 +1,14 @@
-# Copyright 2019 Xiaomi, Inc.  All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+# Created by tz301 on 2020/05/27
+"""Nnet3 node."""
+from abc import ABCMeta
+from enum import Enum, unique
+from typing import Dict, Optional, Set, TextIO, Tuple
 
-"""
-converter.node - class to manage Node
-"""
+import numpy as np
 
-from __future__ import division
-from __future__ import print_function
+from converter.common import KaldiOpRawType
 
 import logging
 
@@ -30,59 +21,59 @@ _LOG = logging.getLogger(__name__)
 
 
 def make_node(name, type, inputs, outputs, attrs=None, consts=None):
-    if type == KaldiOpType.Gemm.name:
-        return GemmNode(name, type, inputs, outputs, attrs, consts)
-    elif type == KaldiOpType.Append.name:
-        return AppendNode(name, type, inputs, outputs, attrs, consts)
-    elif type == KaldiOpType.Bias.name:
-        return BiasNode(name, type, inputs, outputs, attrs, consts)
-    elif type == KaldiOpType.Constant.name:
-        return ConstantNode(name, type, inputs, outputs, attrs, consts)
-    elif type == KaldiOpType.Conv1d.name:
-        return Conv1dNode(name, type, inputs, outputs, attrs, consts)
-    elif type == KaldiOpType.Conv.name:
-        return ConvNode(name, type, inputs, outputs, attrs, consts)
-    elif type == KaldiOpType.Dct.name:
-        return DCTNode(name, type, inputs, outputs, attrs, consts)
-    elif type == KaldiOpType.DynamicLSTM.name:
-        return DynamicLSTMNode(name, type, inputs, outputs, attrs, consts)
-    elif type == KaldiOpType.ExtractPooling.name:
-        return ExtractPoolingNode(name, type, inputs, outputs, attrs, consts)
-    elif type == KaldiOpType.Identity.name:
-        return IdentityNode(name, type, inputs, outputs, attrs, consts)
-    elif type == KaldiOpType.IfDefined.name:
-        return IfDefinedNode(name, type, inputs, outputs, attrs, consts)
-    elif type == KaldiOpType.LstmNonlinear.name:
-        return LSTMNonLinearNode(name, type, inputs, outputs, attrs, consts)
-    elif type == KaldiOpType.Offset.name:
-        return OffsetNode(name, type, inputs, outputs, attrs, consts)
-    elif type == KaldiOpType.ReplaceIndex.name:
-        return ReplaceIndexNode(name, type, inputs, outputs, attrs, consts)
-    elif type == KaldiOpType.RestrictedAttention.name:
-        return RestrictedAttentionNode(name, type, inputs, outputs,
-                                       attrs, consts)
-    elif type == KaldiOpType.Round.name:
-        return RoundNode(name, type, inputs, outputs, attrs, consts)
-    elif type == KaldiOpType.Scales.name:
-        return ScalesNode(name, type, inputs, outputs, attrs, consts)
-    elif type == KaldiOpType.Splice.name:
-        return SpliceNode(name, type, inputs, outputs, attrs, consts)
-    elif type == KaldiOpType.StatisticsExtraction.name:
-        return StatisticsExtractionNode(name, type, inputs,
-                                        outputs, attrs, consts)
-    elif type == KaldiOpType.StatisticsPooling.name:
-        return StatisticsPoolingNode(name, type, inputs, outputs,
+  if type == KaldiOpType.Gemm.name:
+      return GemmNode(name, type, inputs, outputs, attrs, consts)
+  elif type == KaldiOpType.Append.name:
+      return AppendNode(name, type, inputs, outputs, attrs, consts)
+  elif type == KaldiOpType.Bias.name:
+      return BiasNode(name, type, inputs, outputs, attrs, consts)
+  elif type == KaldiOpType.Constant.name:
+      return ConstantNode(name, type, inputs, outputs, attrs, consts)
+  elif type == KaldiOpType.Conv1d.name:
+      return Conv1dNode(name, type, inputs, outputs, attrs, consts)
+  elif type == KaldiOpType.Conv.name:
+      return ConvNode(name, type, inputs, outputs, attrs, consts)
+  elif type == KaldiOpType.Dct.name:
+      return DCTNode(name, type, inputs, outputs, attrs, consts)
+  elif type == KaldiOpType.DynamicLSTM.name:
+      return DynamicLSTMNode(name, type, inputs, outputs, attrs, consts)
+  elif type == KaldiOpType.ExtractPooling.name:
+      return ExtractPoolingNode(name, type, inputs, outputs, attrs, consts)
+  elif type == KaldiOpType.Identity.name:
+      return IdentityNode(name, type, inputs, outputs, attrs, consts)
+  elif type == KaldiOpType.IfDefined.name:
+      return IfDefinedNode(name, type, inputs, outputs, attrs, consts)
+  elif type == KaldiOpType.LstmNonlinear.name:
+      return LSTMNonLinearNode(name, type, inputs, outputs, attrs, consts)
+  elif type == KaldiOpType.Offset.name:
+      return OffsetNode(name, type, inputs, outputs, attrs, consts)
+  elif type == KaldiOpType.ReplaceIndex.name:
+      return ReplaceIndexNode(name, type, inputs, outputs, attrs, consts)
+  elif type == KaldiOpType.RestrictedAttention.name:
+      return RestrictedAttentionNode(name, type, inputs, outputs,
                                      attrs, consts)
-    elif type == KaldiOpType.SumGroup.name:
-        return SumGroupNode(name, type, inputs, outputs, attrs, consts)
-    elif type == KaldiOpType.Subsample.name:
-        return SubsampleNode(name, type, inputs, outputs, attrs, consts)
-    elif type == KaldiOpType.TargetRMSNorm.name:
-        return TargetRMSNormNode(name, type, inputs, outputs, attrs, consts)
-    elif type == KaldiOpType.PerEltScale.name:
-        return PerEltScaleNode(name, type, inputs, outputs, attrs, consts)
-    else:
-        return Node(name, type, inputs, outputs, attrs, consts)
+  elif type == KaldiOpType.Round.name:
+      return RoundNode(name, type, inputs, outputs, attrs, consts)
+  elif type == KaldiOpType.Scales.name:
+      return ScalesNode(name, type, inputs, outputs, attrs, consts)
+  elif type == KaldiOpType.Splice.name:
+      return SpliceNode(name, type, inputs, outputs, attrs, consts)
+  elif type == KaldiOpType.StatisticsExtraction.name:
+      return StatisticsExtractionNode(name, type, inputs,
+                                      outputs, attrs, consts)
+  elif type == KaldiOpType.StatisticsPooling.name:
+      return StatisticsPoolingNode(name, type, inputs, outputs,
+                                   attrs, consts)
+  elif type == KaldiOpType.SumGroup.name:
+      return SumGroupNode(name, type, inputs, outputs, attrs, consts)
+  elif type == KaldiOpType.Subsample.name:
+      return SubsampleNode(name, type, inputs, outputs, attrs, consts)
+  elif type == KaldiOpType.TargetRMSNorm.name:
+      return TargetRMSNormNode(name, type, inputs, outputs, attrs, consts)
+  elif type == KaldiOpType.PerEltScale.name:
+      return PerEltScaleNode(name, type, inputs, outputs, attrs, consts)
+  else:
+      return Node(name, type, inputs, outputs, attrs, consts)
 
 
 class Node(object):
