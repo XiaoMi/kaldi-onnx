@@ -535,7 +535,7 @@ class Parser:
     Returns:
       Component.
     """
-    terminating_token = f"</{component_type[1:]}"
+    terminating_token = f'</{component_type[1:]}'
     terminating_tokens = {terminating_token, '<ComponentName>'}
 
     component_type = component_type[1:-1]

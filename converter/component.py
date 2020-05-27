@@ -58,7 +58,7 @@ class Component(metaclass=ABCMeta):
       if token is None:
         line = next(line_buffer)
         if line is None:
-          raise ValueError(f"Error parsing nnet3 file.")
+          raise ValueError(f'Error parsing nnet3 file.')
         else:
           pos = 0
           continue
@@ -253,11 +253,11 @@ def read_component_type(line: str, pos: int) -> Tuple[str, int]:
   """
   component_type, pos = read_next_token(line, pos)
   if (isinstance(component_type, str) and len(component_type) >= 13 and
-      component_type[0] == "<" and component_type[-10:] == "Component>"):
+      component_type[0] == '<' and component_type[-10:] == 'Component>'):
     return component_type, pos
   else:
     raise ValueError(f'error reading Component: at position {pos}, '
-                     f'expected <xxxxComponent>,got: {component_type}.')
+                     f'expected <xxxComponent>,got: {component_type}.')
 
 
 def _read_bool(line: str, pos: int, line_buffer: TextIO) -> Tuple[bool, int]:
@@ -324,7 +324,7 @@ def __read_vector(line: str, pos: int,
   """
   tok, pos = read_next_token(line, pos)
   if tok != '[':
-    raise ValueError(f"Error at line position {pos}, expected [ but got {tok}.")
+    raise ValueError(f'Error at line position {pos}, expected [ but got {tok}.')
 
   vector = []
   while True:
@@ -334,7 +334,7 @@ def __read_vector(line: str, pos: int,
     if tok is None:
       line = next(line_buffer)
       if line is None:
-        raise ValueError("Encountered EOF while reading vector.")
+        raise ValueError('Encountered EOF while reading vector.')
       else:
         pos = 0
         continue
@@ -342,7 +342,7 @@ def __read_vector(line: str, pos: int,
     vector.append(tok)
 
   if tok is None:
-    raise ValueError("Encountered EOF while reading vector.")
+    raise ValueError('Encountered EOF while reading vector.')
   return vector, pos
 
 
@@ -392,7 +392,7 @@ def __check_for_newline(line: str, pos: int) -> Tuple[bool, int]:
   assert pos >= 0
   saw_newline = False
   while pos < len(line) and line[pos].isspace():
-    if line[pos] == "\n":
+    if line[pos] == '\n':
       saw_newline = True
     pos += 1
   return saw_newline, pos
@@ -412,7 +412,7 @@ def _read_matrix_trans(line: str, pos: int,
   """
   tok, pos = read_next_token(line, pos)
   if tok != '[':
-    raise ValueError(f"Error at line position {pos}, expected [ but got {tok}.")
+    raise ValueError(f'Error at line position {pos}, expected [ but got {tok}.')
 
   mat = []
   while True:
@@ -438,7 +438,7 @@ def _read_matrix_trans(line: str, pos: int,
     if tok is None:
       line = next(line_buffer)
       if line is None:
-        raise ValueError("Encountered EOF while reading matrix.")
+        raise ValueError('Encountered EOF while reading matrix.')
       else:
         pos = 0
 
